@@ -23,7 +23,7 @@ A minimal hybrid rendering sample using ray query
 
 See [Vulkan Tutorial / Development environment](https://vulkan-tutorial.com/Development_environment)
 
-# References
+## References
 
 -   [Vulkan Tutorial](https://vulkan-tutorial.com/)
 -   [SaschaWillems/Vulkan](https://github.com/SaschaWillems/Vulkan)

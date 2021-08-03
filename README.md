@@ -2,7 +2,7 @@
 
 A minimal hybrid rendering sample using ray query
 
-![](https://user-images.githubusercontent.com/30839669/127963390-51ab35d3-0815-46c3-91ae-1f7f24eeffc6.png)
+![](https://user-images.githubusercontent.com/30839669/127963548-6fe937f0-3739-402e-ac3c-5e3fe6468266.png)
 
 ## Features
 

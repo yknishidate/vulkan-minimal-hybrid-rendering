@@ -199,6 +199,7 @@ struct Image
         createInfo.setTiling(vk::ImageTiling::eOptimal);
         createInfo.setUsage(usage);
         image = device.createImageUnique(createInfo);
+        imageLayout = vkIL::eUndefined;
     }
 
     void allocate(vk::PhysicalDevice physicalDevice)

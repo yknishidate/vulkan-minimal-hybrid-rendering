@@ -19,8 +19,7 @@ struct AccelerationStructure
         geometryInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
         geometryInfo.setGeometries(geometry);
 
-        vk::AccelerationStructureBuildSizesInfoKHR buildSizesInfo =
-            Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
+        auto buildSizesInfo = Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
         vk::DeviceSize size = buildSizesInfo.accelerationStructureSize;
         buffer = Buffer{ size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
 

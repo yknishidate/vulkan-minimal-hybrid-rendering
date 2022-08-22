@@ -27,15 +27,15 @@ int main()
         {
             Swapchain swapchain;
 
+            Scene scene{ "../assets/bunny_and_teapot.obj" };
+
             GraphicsPipeline pipeline{
                 "../shaders/spv/shader.vert.spv",
                 "../shaders/spv/shader.frag.spv",
                 swapchain.extent, *swapchain.renderPass
             };
 
-            Scene scene{ "../assets/bunny_and_teapot.obj" };
-
-            std::vector descriptorWrites{ scene.topLevelAS.createDescWrite(1) };
+            std::vector descriptorWrites{ scene.topLevelAS.createDescWrite(0) };
             pipeline.updateDescriptorSets(descriptorWrites);
 
             std::vector commandBuffers = Context::allocateCommandBuffers(swapchain.imageCount);

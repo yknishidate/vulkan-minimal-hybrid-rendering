@@ -1,7 +1,7 @@
 #version 460
 #extension GL_EXT_ray_query : enable
 
-layout(binding = 1) uniform accelerationStructureEXT topLevelAS;
+layout(binding = 0) uniform accelerationStructureEXT topLevelAS;
 
 layout(location = 0)      in vec3 inNormal;
 layout(location = 1) flat in uint inMeshIndex;

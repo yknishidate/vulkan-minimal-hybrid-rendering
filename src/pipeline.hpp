@@ -47,12 +47,10 @@ struct GraphicsPipeline
     {
         // Create descriptor set layout
         {
-            std::vector<vk::DescriptorSetLayoutBinding> bindings;
-            bindings.emplace_back(0, vkDT::eUniformBuffer, 1, vkSS::eVertex);
-            bindings.emplace_back(1, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment);
+            vk::DescriptorSetLayoutBinding binding{ 0, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment };
 
             vk::DescriptorSetLayoutCreateInfo layoutInfo;
-            layoutInfo.setBindings(bindings);
+            layoutInfo.setBindings(binding);
             descriptorSetLayout = Context::device.createDescriptorSetLayoutUnique(layoutInfo);
         }
 
@@ -99,20 +97,20 @@ struct GraphicsPipeline
             vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
             inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
 
-            float width = static_cast<float>(Window::width);
-            float height = static_cast<float>(Window::height);
+            auto width = static_cast<float>(Window::width);
+            auto height = static_cast<float>(Window::height);
             vk::Viewport viewport{ 0.0f, 0.0f, width, height, 0.0f, 1.0f };
             vk::Rect2D scissor{ { 0, 0 }, extent };
             vk::PipelineViewportStateCreateInfo viewportState{ {}, 1, &viewport, 1, &scissor };
 
-            vk::PipelineRasterizationStateCreateInfo rasterizer;
-            rasterizer.setDepthClampEnable(VK_FALSE);
-            rasterizer.setRasterizerDiscardEnable(VK_FALSE);
-            rasterizer.setPolygonMode(vk::PolygonMode::eFill);
-            rasterizer.setCullMode(vk::CullModeFlagBits::eNone);
-            rasterizer.setFrontFace(vk::FrontFace::eCounterClockwise);
-            rasterizer.setDepthBiasEnable(VK_FALSE);
-            rasterizer.setLineWidth(1.0f);
+            vk::PipelineRasterizationStateCreateInfo rasterization;
+            rasterization.setDepthClampEnable(VK_FALSE);
+            rasterization.setRasterizerDiscardEnable(VK_FALSE);
+            rasterization.setPolygonMode(vk::PolygonMode::eFill);
+            rasterization.setCullMode(vk::CullModeFlagBits::eNone);
+            rasterization.setFrontFace(vk::FrontFace::eCounterClockwise);
+            rasterization.setDepthBiasEnable(VK_FALSE);
+            rasterization.setLineWidth(1.0f);
 
             vk::PipelineMultisampleStateCreateInfo multisampling;
             multisampling.setSampleShadingEnable(VK_FALSE);
@@ -138,7 +136,7 @@ struct GraphicsPipeline
             pipelineInfo.setPVertexInputState(&vertexInputInfo);
             pipelineInfo.setPInputAssemblyState(&inputAssembly);
             pipelineInfo.setPViewportState(&viewportState);
-            pipelineInfo.setPRasterizationState(&rasterizer);
+            pipelineInfo.setPRasterizationState(&rasterization);
             pipelineInfo.setPMultisampleState(&multisampling);
             pipelineInfo.setPDepthStencilState(&depthStencil);
             pipelineInfo.setPColorBlendState(&colorBlending);

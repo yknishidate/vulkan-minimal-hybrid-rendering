@@ -410,7 +410,7 @@ public:
     }
 
 private:
-    std::vector<vk::UniqueFramebuffer> swapChainFramebuffers;
+    std::vector<vk::UniqueFramebuffer> swapchainFramebuffers;
     Image depthImage;
 
     vk::UniqueDescriptorSetLayout descriptorSetLayout;
@@ -595,7 +595,7 @@ private:
 
     void createFramebuffers()
     {
-        swapChainFramebuffers.reserve(Context::swapchainImageViews.size());
+        swapchainFramebuffers.reserve(Context::swapchainImageViews.size());
         for (auto const& view : Context::swapchainImageViews) {
             std::array attachments{ view, *depthImage.view };
             vk::FramebufferCreateInfo framebufferInfo;
@@ -604,7 +604,7 @@ private:
             framebufferInfo.setWidth(static_cast<uint32_t>(Window::getWidth()));
             framebufferInfo.setHeight(static_cast<uint32_t>(Window::getHeight()));
             framebufferInfo.setLayers(1);
-            swapChainFramebuffers.push_back(Context::device.createFramebufferUnique(framebufferInfo));
+            swapchainFramebuffers.push_back(Context::device.createFramebufferUnique(framebufferInfo));
         }
     }
 
@@ -756,7 +756,7 @@ private:
     {
         vk::CommandBufferAllocateInfo allocInfo;
         allocInfo.setCommandPool(Context::commandPool);
-        allocInfo.setCommandBufferCount(static_cast<uint32_t>(swapChainFramebuffers.size()));
+        allocInfo.setCommandBufferCount(static_cast<uint32_t>(swapchainFramebuffers.size()));
         commandBuffers = Context::device.allocateCommandBuffersUnique(allocInfo);
 
         std::array<vk::ClearValue, 2> clearValues;
@@ -768,7 +768,7 @@ private:
         renderPassInfo.setRenderArea({ {0, 0}, {static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight())} });
         renderPassInfo.setClearValues(clearValues);
         for (size_t i = 0; i < commandBuffers.size(); i++) {
-            renderPassInfo.setFramebuffer(*swapChainFramebuffers[i]);
+            renderPassInfo.setFramebuffer(*swapchainFramebuffers[i]);
             commandBuffers[i]->begin(vk::CommandBufferBeginInfo{});
             commandBuffers[i]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
@@ -857,22 +857,25 @@ private:
 int main()
 {
     try {
-        Mesh mesh;
-        mesh.load("../assets/bunny_and_teapot.obj");
-
-        Application app;
-        app.setVertShaderPath("../shaders/spv/shader.vert.spv");
-        app.setFragShaderPath("../shaders/spv/shader.frag.spv");
-        app.setMesh(mesh);
-
         Window::init(1000, 800);
         Context::init();
-        app.initVulkan();
-        app.mainLoop();
+
+        {
+            Mesh mesh;
+            mesh.load("../assets/bunny_and_teapot.obj");
+
+            Application app;
+            app.setVertShaderPath("../shaders/spv/shader.vert.spv");
+            app.setFragShaderPath("../shaders/spv/shader.frag.spv");
+            app.setMesh(mesh);
+            app.initVulkan();
+            app.mainLoop();
+        }
+
+        Context::terminate();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
     }
-    Context::terminate();
     return EXIT_SUCCESS;
 }

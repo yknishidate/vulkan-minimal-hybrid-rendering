@@ -28,9 +28,17 @@ inline vk::UniqueShaderModule createShaderModule(const std::string& shaderPath)
     return Context::device.createShaderModuleUnique(createInfo);
 }
 
+struct Matrices
+{
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 struct GraphicsPipeline
 {
     using vkDT = vk::DescriptorType;
+    using vkSS = vk::ShaderStageFlagBits;
 
     GraphicsPipeline(const std::string& vertShaderPath,
                      const std::string& fragShaderPath,
@@ -39,7 +47,6 @@ struct GraphicsPipeline
     {
         // Create descriptor set layout
         {
-            using vkSS = vk::ShaderStageFlagBits;
             std::vector<vk::DescriptorSetLayoutBinding> bindings;
             bindings.emplace_back(0, vkDT::eUniformBuffer, 1, vkSS::eVertex);
             bindings.emplace_back(1, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment);
@@ -52,6 +59,19 @@ struct GraphicsPipeline
         // Allocate descriptor set
         {
             descriptorSet = Context::allocateDescSet(*descriptorSetLayout);
+        }
+
+        // Create pipeline layout
+        {
+            vk::PushConstantRange pushRange;
+            pushRange.setOffset(0);
+            pushRange.setSize(sizeof(Matrices));
+            pushRange.setStageFlags(vkSS::eVertex);
+
+            vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+            pipelineLayoutInfo.setSetLayouts(*descriptorSetLayout);
+            pipelineLayoutInfo.setPushConstantRanges(pushRange);
+            pipelineLayout = Context::device.createPipelineLayoutUnique(pipelineLayoutInfo);
         }
 
         // Create graphics pipeline
@@ -113,10 +133,6 @@ struct GraphicsPipeline
             colorBlending.setLogicOpEnable(VK_FALSE);
             colorBlending.setAttachments(colorBlendAttachment);
 
-            vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
-            pipelineLayoutInfo.setSetLayouts(*descriptorSetLayout);
-            pipelineLayout = Context::device.createPipelineLayoutUnique(pipelineLayoutInfo);
-
             vk::GraphicsPipelineCreateInfo pipelineInfo;
             pipelineInfo.setStages(shaderStages);
             pipelineInfo.setPVertexInputState(&vertexInputInfo);
@@ -136,6 +152,11 @@ struct GraphicsPipeline
             }
             pipeline = std::move(result.value);
         }
+    }
+
+    void pushMatrices(vk::CommandBuffer commandBuffer, const Matrices* matrices)
+    {
+        commandBuffer.pushConstants(*pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrices), matrices);
     }
 
     void updateDescriptorSets(std::vector<vk::WriteDescriptorSet> writes)

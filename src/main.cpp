@@ -1,29 +1,22 @@
 
 #include "pipeline.hpp"
 
-struct UniformBufferObject
+void updateMatrices(Matrices& matrices)
 {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+    static uint64_t frame = 0;
 
-    void update()
-    {
-        static uint64_t frame = 0;
+    float angle = frame * glm::radians(1.0f);
+    glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f));
+    glm::vec3 camPos = glm::vec3(rotate * glm::vec4(12.0f, -12.0f, 12.0f, 1.0f));
+    float aspect = Window::width / static_cast<float>(Window::height);
 
-        float angle = frame * glm::radians(1.0f);
-        glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f));
-        glm::vec3 camPos = glm::vec3(rotate * glm::vec4(12.0f, -12.0f, 12.0f, 1.0f));
-        float aspect = Window::width / static_cast<float>(Window::height);
+    matrices.model = glm::mat4{ 1.0f };
+    matrices.view = glm::lookAt(camPos, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    matrices.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+    matrices.proj[1][1] *= -1;
 
-        model = glm::mat4{ 1.0f };
-        view = glm::lookAt(camPos, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
-        proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
-        proj[1][1] *= -1;
-
-        frame++;
-    }
-};
+    frame++;
+}
 
 int main()
 {
@@ -35,39 +28,30 @@ int main()
             Swapchain swapchain;
 
             GraphicsPipeline pipeline{
-                "../shaders/spv/shader.vert.spv", "../shaders/spv/shader.frag.spv",
+                "../shaders/spv/shader.vert.spv",
+                "../shaders/spv/shader.frag.spv",
                 swapchain.extent, *swapchain.renderPass
             };
 
             Scene scene{ "../assets/bunny_and_teapot.obj" };
 
-            Buffer uniformBuffer{
-                sizeof(UniformBufferObject),
-                vk::BufferUsageFlagBits::eUniformBuffer,
-                vkMP::eHostVisible | vkMP::eHostCoherent
-            };
-
-            std::vector descriptorWrites{
-                uniformBuffer.createDescWrite(vkDT::eUniformBuffer, 0),
-                scene.topLevelAS.createDescWrite(1)
-            };
+            std::vector descriptorWrites{ scene.topLevelAS.createDescWrite(1) };
             pipeline.updateDescriptorSets(descriptorWrites);
 
             std::vector commandBuffers = Context::allocateCommandBuffers(swapchain.imageCount);
 
-            UniformBufferObject ubo;
+            Matrices matrices;
 
             while (!Window::shouldClose()) {
                 Window::pollEvents();
+                updateMatrices(matrices);
+
                 uint32_t imageIndex = swapchain.acquireNextImage();
-
-                ubo.update();
-                uniformBuffer.copy(&ubo);
-
                 vk::CommandBuffer commandBuffer = *commandBuffers[imageIndex];
                 commandBuffer.begin(vk::CommandBufferBeginInfo{});
                 swapchain.beginRenderPass(commandBuffer, imageIndex);
                 pipeline.bind(commandBuffer);
+                pipeline.pushMatrices(commandBuffer, &matrices);
                 scene.draw(commandBuffer);
                 swapchain.endRenderPass(commandBuffer);
                 commandBuffer.end();

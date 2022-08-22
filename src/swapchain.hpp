@@ -10,7 +10,6 @@ struct Swapchain
         {
             extent.width = static_cast<uint32_t>(Window::getWidth());
             extent.height = static_cast<uint32_t>(Window::getHeight());
-            imageCount = 3;
 
             vk::SwapchainCreateInfoKHR swapchainInfo{};
             swapchainInfo.setSurface(Context::surface);
@@ -29,7 +28,6 @@ struct Swapchain
         // Create swapchain image views
         {
             images = Context::device.getSwapchainImagesKHR(*swapchain);
-            imageViews.resize(imageCount);
 
             vk::ImageSubresourceRange subresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
             for (size_t i = 0; i < imageCount; i++) {
@@ -38,7 +36,7 @@ struct Swapchain
                 createInfo.setViewType(vk::ImageViewType::e2D);
                 createInfo.setFormat(vk::Format::eB8G8R8A8Unorm);
                 createInfo.setSubresourceRange(subresourceRange);
-                imageViews[i] = Context::device.createImageViewUnique(createInfo);
+                imageViews.push_back(Context::device.createImageViewUnique(createInfo));
             }
         }
 
@@ -135,14 +133,10 @@ struct Swapchain
 
         // Create sync objects
         {
-            imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-            renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-            inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                imageAvailableSemaphores[i] = Context::device.createSemaphoreUnique({});
-                renderFinishedSemaphores[i] = Context::device.createSemaphoreUnique({});
-                inFlightFences[i] = Context::device.createFenceUnique({ vk::FenceCreateFlagBits::eSignaled });
+            for (size_t i = 0; i < maxFramesCount; i++) {
+                imageAvailableSemaphores.push_back(Context::device.createSemaphoreUnique({}));
+                renderFinishedSemaphores.push_back(Context::device.createSemaphoreUnique({}));
+                inFlightFences.push_back(Context::device.createFenceUnique({ vk::FenceCreateFlagBits::eSignaled }));
             }
         }
     }
@@ -176,13 +170,13 @@ struct Swapchain
         vk::PresentInfoKHR presentInfo{ *renderFinishedSemaphores[currentFrame], *swapchain, imageIndex };
         Context::queue.presentKHR(presentInfo);
 
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        currentFrame = (currentFrame + 1) % maxFramesCount;
     }
 
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    const uint32_t maxFramesCount = 2;
+    const uint32_t imageCount = 3;
 
     vk::Extent2D extent;
-    uint32_t imageCount;
 
     vk::UniqueSwapchainKHR swapchain;
     std::vector<vk::Image> images;

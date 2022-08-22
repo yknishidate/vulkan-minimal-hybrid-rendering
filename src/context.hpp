@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <iostream>
 #include <functional>
@@ -217,8 +219,9 @@ struct Context
     static inline uint32_t queueFamily;
     static inline vk::Queue queue;
     static inline vk::CommandPool commandPool;
+    static inline vk::DescriptorPool descriptorPool;
+
     static inline vk::SwapchainKHR swapchain;
     static inline std::vector<vk::Image> swapchainImages;
     static inline std::vector<vk::ImageView> swapchainImageViews;
-    static inline vk::DescriptorPool descriptorPool;
 };

@@ -11,17 +11,17 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-VKAPI_ATTR VkBool32 VKAPI_CALL
-debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                            VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                            VkDebugUtilsMessengerCallbackDataEXT const *pCallbackData, void *pUserData)
-{
-    std::cerr << pCallbackData->pMessage << "\n\n";
-    return VK_FALSE;
-}
-
 struct Context
 {
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+        VkDebugUtilsMessengerCallbackDataEXT const *pCallbackData, void *pUserData)
+    {
+        std::cerr << pCallbackData->pMessage << "\n\n";
+        return VK_FALSE;
+    }
+
     static void init()
     {
         // Create instance

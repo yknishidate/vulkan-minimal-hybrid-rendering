@@ -96,6 +96,28 @@ struct Context
             queue = device.getQueue(queueFamily, 0);
         }
 
+        // Create command pool
+        {
+            vk::CommandPoolCreateInfo poolInfo;
+            poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+            poolInfo.setQueueFamilyIndex(queueFamily);
+            commandPool = device.createCommandPool(poolInfo);
+        }
+
+        // Create descriptor pool
+        {
+            std::vector<vk::DescriptorPoolSize> poolSizes{
+                {vk::DescriptorType::eUniformBuffer, 1},
+                {vk::DescriptorType::eAccelerationStructureKHR, 1}
+            };
+
+            vk::DescriptorPoolCreateInfo poolInfo;
+            poolInfo.setPoolSizes(poolSizes);
+            poolInfo.setMaxSets(3);
+            poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+            descriptorPool = device.createDescriptorPool(poolInfo);
+        }
+
         // Create swapchain
         {
             vk::SwapchainCreateInfoKHR swapchainInfo{};
@@ -126,28 +148,6 @@ struct Context
                 createInfo.setSubresourceRange(subresourceRange);
                 swapchainImageViews[i] = device.createImageView(createInfo);
             }
-        }
-
-        // Create command pool
-        {
-            vk::CommandPoolCreateInfo poolInfo;
-            poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-            poolInfo.setQueueFamilyIndex(queueFamily);
-            commandPool = device.createCommandPool(poolInfo);
-        }
-
-        // Create descriptor pool
-        {
-            std::vector<vk::DescriptorPoolSize> poolSizes{
-                {vk::DescriptorType::eUniformBuffer, 1},
-                {vk::DescriptorType::eAccelerationStructureKHR, 1}
-            };
-
-            vk::DescriptorPoolCreateInfo poolInfo;
-            poolInfo.setPoolSizes(poolSizes);
-            poolInfo.setMaxSets(3);
-            poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-            descriptorPool = device.createDescriptorPool(poolInfo);
         }
     }
 
@@ -199,11 +199,11 @@ struct Context
 
     static void terminate()
     {
-        device.destroyDescriptorPool(descriptorPool);
         for(auto view: swapchainImageViews) {
             device.destroyImageView(view);
         }
         device.destroySwapchainKHR(swapchain);
+        device.destroyDescriptorPool(descriptorPool);
         device.destroyCommandPool(commandPool);
         device.destroy();
         instance.destroySurfaceKHR(surface);

@@ -75,8 +75,8 @@ struct Buffer
             memory = Context::device.allocateMemoryUnique(allocInfo);
             Context::device.bindBufferMemory(*buffer, *memory, 0);
 
-            vk::BufferDeviceAddressInfoKHR bufferDeviceAI{ *buffer };
-            deviceAddress = Context::device.getBufferAddressKHR(&bufferDeviceAI);
+            vk::BufferDeviceAddressInfoKHR addressInfo{ *buffer };
+            deviceAddress = Context::device.getBufferAddressKHR(&addressInfo);
         } else {
             memory = Context::device.allocateMemoryUnique(allocInfo);
             Context::device.bindBufferMemory(*buffer, *memory, 0);
@@ -171,7 +171,7 @@ struct Mesh
 
 struct AccelerationStructure
 {
-    vk::UniqueAccelerationStructureKHR handle;
+    vk::UniqueAccelerationStructureKHR accel;
     Buffer buffer;
 
     vk::AccelerationStructureTypeKHR type;
@@ -203,22 +203,22 @@ struct AccelerationStructure
         createInfo.setBuffer(*buffer.buffer);
         createInfo.setSize(size);
         createInfo.setType(type);
-        handle = Context::device.createAccelerationStructureKHRUnique(createInfo);
+        accel = Context::device.createAccelerationStructureKHRUnique(createInfo);
 
         Buffer scratchBuffer{ size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
         geometryInfo.setScratchData(scratchBuffer.deviceAddress);
-        geometryInfo.setDstAccelerationStructure(*handle);
+        geometryInfo.setDstAccelerationStructure(*accel);
 
         vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{ primitiveCount , 0, 0, 0 };
-        Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer)
-                               {
-                                   commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
-                               });
+        Context::oneTimeSubmit(
+            [&](vk::CommandBuffer commandBuffer) {
+                commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
+            });
     }
 
-    vk::WriteDescriptorSet createDescWrite(vk::DescriptorSet& descSet, uint32_t binding)
+    vk::WriteDescriptorSet createDescWrite(vk::DescriptorSet descSet, uint32_t binding)
     {
-        asInfo = vk::WriteDescriptorSetAccelerationStructureKHR{ *handle };
+        asInfo = vk::WriteDescriptorSetAccelerationStructureKHR{ *accel };
         vk::WriteDescriptorSet asWrite;
         asWrite.setDstSet(descSet);
         asWrite.setDescriptorType(vkDT::eAccelerationStructureKHR);

@@ -128,8 +128,6 @@ struct Image
     vk::UniqueDeviceMemory memory;
     vk::Extent2D extent;
     vk::Format format;
-    vk::ImageLayout imageLayout;
-    vk::ImageAspectFlags aspect;
 
     void create(vk::Extent2D extent, vk::Format format, vk::ImageUsageFlags usage)
     {
@@ -145,7 +143,6 @@ struct Image
         createInfo.setTiling(vk::ImageTiling::eOptimal);
         createInfo.setUsage(usage);
         image = Context::device.createImageUnique(createInfo);
-        imageLayout = vkIL::eUndefined;
     }
 
     void allocate()
@@ -159,67 +156,12 @@ struct Image
 
     void createView(vk::ImageAspectFlags aspect)
     {
-        this->aspect = aspect;
         vk::ImageViewCreateInfo createInfo;
         createInfo.setImage(*image);
         createInfo.setViewType(vk::ImageViewType::e2D);
         createInfo.setFormat(format);
         createInfo.setSubresourceRange({ aspect, 0, 1, 0, 1 });
         view = Context::device.createImageViewUnique(createInfo);
-    }
-
-    bool hasStencilComponent(vk::Format format)
-    {
-        return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
-    }
-
-    void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::ImageLayout newLayout)
-    {
-        vk::ImageMemoryBarrier barrier;
-        barrier.setOldLayout(imageLayout);
-        barrier.setNewLayout(newLayout);
-        barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-        barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-        barrier.setImage(*image);
-        barrier.setSubresourceRange({ aspect, 0, 1, 0, 1 });
-
-        vk::PipelineStageFlags srcStage;
-        vk::PipelineStageFlags dstStage;
-
-        if (imageLayout == vkIL::eUndefined && newLayout == vkIL::eTransferDstOptimal) {
-            barrier.srcAccessMask = {};
-            barrier.dstAccessMask = vkA::eTransferWrite;
-            srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
-            dstStage = vk::PipelineStageFlagBits::eTransfer;
-        } else if (imageLayout == vkIL::eTransferDstOptimal &&
-                   newLayout == vkIL::eShaderReadOnlyOptimal) {
-            barrier.srcAccessMask = vkA::eTransferWrite;
-            barrier.dstAccessMask = vkA::eShaderRead;
-            srcStage = vk::PipelineStageFlagBits::eTransfer;
-            dstStage = vk::PipelineStageFlagBits::eFragmentShader;
-        } else if (imageLayout == vkIL::eUndefined &&
-                   newLayout == vkIL::eDepthStencilAttachmentOptimal) {
-            barrier.srcAccessMask = {};
-            barrier.dstAccessMask = (vkA::eDepthStencilAttachmentRead |
-                                     vkA::eDepthStencilAttachmentWrite);
-            srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
-            dstStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-        } else {
-            throw std::invalid_argument("unsupported layout transition!");
-        }
-
-        if (newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
-
-            if (hasStencilComponent(format)) {
-                barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
-            }
-        } else {
-            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-        }
-
-        commandBuffer.pipelineBarrier(srcStage, dstStage, {}, {}, {}, barrier);
-        imageLayout = newLayout;
     }
 };
 
@@ -616,8 +558,23 @@ private:
         depthImage.createView(vk::ImageAspectFlagBits::eDepth);
 
         Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer) {
-            vk::ImageLayout layout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-            depthImage.transitionImageLayout(commandBuffer, layout);
+            vk::ImageMemoryBarrier barrier;
+            barrier.setOldLayout(vk::ImageLayout::eUndefined);
+            barrier.setNewLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+            barrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            barrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
+            barrier.setImage(*depthImage.image);
+            barrier.setSubresourceRange({ vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1 });
+
+            barrier.srcAccessMask = {};
+            barrier.dstAccessMask = vkA::eDepthStencilAttachmentRead |
+                                    vkA::eDepthStencilAttachmentWrite;
+            vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            vk::PipelineStageFlags dstStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+
+            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+
+            commandBuffer.pipelineBarrier(srcStage, dstStage, {}, {}, {}, barrier);
         });
     }
 

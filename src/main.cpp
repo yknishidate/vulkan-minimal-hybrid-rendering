@@ -414,7 +414,7 @@ private:
     Image depthImage;
 
     vk::UniqueDescriptorSetLayout descriptorSetLayout;
-    std::vector<vk::UniqueDescriptorSet> descriptorSets;
+    vk::UniqueDescriptorSet descriptorSet;
 
     std::vector<Vertex> vertices;
     std::vector<uint16_t> indices;
@@ -426,7 +426,7 @@ private:
 
     Buffer vertexBuffer;
     Buffer indexBuffer;
-    std::vector<Buffer> uniformBuffers;
+    Buffer uniformBuffer;
     AccelerationStructure bottomLevelAS;
     AccelerationStructure topLevelAS;
 
@@ -649,12 +649,8 @@ private:
 
     void createUniformBuffers()
     {
-        vk::DeviceSize size = sizeof(UniformBufferObject);
-        uniformBuffers.resize(Context::swapchainImages.size());
-        for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
-            uniformBuffers[i].create(size, vk::BufferUsageFlagBits::eUniformBuffer);
-            uniformBuffers[i].allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
-        }
+        uniformBuffer.create(sizeof(UniformBufferObject), vk::BufferUsageFlagBits::eUniformBuffer);
+        uniformBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
     }
 
     void updateUniformBuffer(uint32_t currentImage)
@@ -675,7 +671,8 @@ private:
         ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
         ubo.proj[1][1] *= -1;
 
-        uniformBuffers[currentImage].copy(&ubo);
+        //uniformBuffers[currentImage].copy(&ubo);
+        uniformBuffer.copy(&ubo);
     }
 
     void createBottomLevelAS()
@@ -736,20 +733,13 @@ private:
     
     void createDescriptorSets()
     {
-        std::vector layouts{ Context::swapchainImages.size(), *descriptorSetLayout };
-        vk::DescriptorSetAllocateInfo allocInfo;
-        allocInfo.setDescriptorPool(Context::descriptorPool);
-        allocInfo.setSetLayouts(layouts);
-
-        descriptorSets.resize(Context::swapchainImages.size());
-        descriptorSets = Context::device.allocateDescriptorSetsUnique(allocInfo);
-
-        for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
-            std::vector<vk::WriteDescriptorSet> descriptorWrites{
-                uniformBuffers[i].createDescWrite(*descriptorSets[i], vkDT::eUniformBuffer, 0),
-                topLevelAS.createDescWrite(*descriptorSets[i], 1) };
-            Context::device.updateDescriptorSets(descriptorWrites, nullptr);
-        }
+        descriptorSet = Context::allocateDescSet(*descriptorSetLayout);
+        
+        std::vector descriptorWrites{
+            uniformBuffer.createDescWrite(*descriptorSet, vkDT::eUniformBuffer, 0),
+            topLevelAS.createDescWrite(*descriptorSet, 1)
+        };
+        Context::device.updateDescriptorSets(descriptorWrites, nullptr);
     }
 
     void createCommandBuffers()
@@ -777,7 +767,7 @@ private:
             commandBuffers[i]->bindVertexBuffers(0, *vertexBuffer.buffer, offsets);
             commandBuffers[i]->bindIndexBuffer(*indexBuffer.buffer, 0, vk::IndexType::eUint16);
             commandBuffers[i]->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                                  *pipelineLayout, 0, *descriptorSets[i], nullptr);
+                                                  *pipelineLayout, 0, *descriptorSet, nullptr);
             commandBuffers[i]->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
             commandBuffers[i]->endRenderPass();

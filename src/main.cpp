@@ -32,31 +32,31 @@ struct Vertex
 
     static vk::VertexInputBindingDescription getBindingDescription()
     {
-        vk::VertexInputBindingDescription bindingDescription;
-        bindingDescription.setBinding(0);
-        bindingDescription.setStride(sizeof(Vertex));
-        bindingDescription.setInputRate(vk::VertexInputRate::eVertex);
-        return bindingDescription;
+        vk::VertexInputBindingDescription description;
+        description.setBinding(0);
+        description.setStride(sizeof(Vertex));
+        description.setInputRate(vk::VertexInputRate::eVertex);
+        return description;
     }
 
     static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions()
     {
-        std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions;
-        attributeDescriptions[0].setBinding(0);
-        attributeDescriptions[0].setLocation(0);
-        attributeDescriptions[0].setFormat(vk::Format::eR32G32B32Sfloat);
-        attributeDescriptions[0].setOffset(offsetof(Vertex, pos));
+        std::array<vk::VertexInputAttributeDescription, 3> descriptions;
+        descriptions[0].setBinding(0);
+        descriptions[0].setLocation(0);
+        descriptions[0].setFormat(vk::Format::eR32G32B32Sfloat);
+        descriptions[0].setOffset(offsetof(Vertex, pos));
 
-        attributeDescriptions[1].setBinding(0);
-        attributeDescriptions[1].setLocation(1);
-        attributeDescriptions[1].setFormat(vk::Format::eR32G32B32Sfloat);
-        attributeDescriptions[1].setOffset(offsetof(Vertex, normal));
+        descriptions[1].setBinding(0);
+        descriptions[1].setLocation(1);
+        descriptions[1].setFormat(vk::Format::eR32G32B32Sfloat);
+        descriptions[1].setOffset(offsetof(Vertex, normal));
 
-        attributeDescriptions[2].setBinding(0);
-        attributeDescriptions[2].setLocation(2);
-        attributeDescriptions[2].setFormat(vk::Format::eR16Uint);
-        attributeDescriptions[2].setOffset(offsetof(Vertex, meshIndex));
-        return attributeDescriptions;
+        descriptions[2].setBinding(0);
+        descriptions[2].setLocation(2);
+        descriptions[2].setFormat(vk::Format::eR16Uint);
+        descriptions[2].setOffset(offsetof(Vertex, meshIndex));
+        return descriptions;
     }
 };
 
@@ -628,7 +628,8 @@ private:
             vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
-            vkBU::eVertexBuffer };
+            vkBU::eVertexBuffer
+        };
         vertexBuffer.create(size, usage);
         vertexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         vertexBuffer.copy(vertices.data());
@@ -653,7 +654,7 @@ private:
         uniformBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
     }
 
-    void updateUniformBuffer(uint32_t currentImage)
+    void updateUniformBuffer()
     {
         using namespace std::chrono;
         static auto startTime = high_resolution_clock::now();
@@ -671,7 +672,6 @@ private:
         ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
         ubo.proj[1][1] *= -1;
 
-        //uniformBuffers[currentImage].copy(&ubo);
         uniformBuffer.copy(&ubo);
     }
 
@@ -811,7 +811,7 @@ private:
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
         Context::device.resetFences(inFlightFences[currentFrame]);
 
-        updateUniformBuffer(imageIndex);
+        updateUniformBuffer();
 
         vk::PipelineStageFlags waitStage{ vk::PipelineStageFlagBits::eColorAttachmentOutput };
         vk::Semaphore imageAvailableSemaphore = *imageAvailableSemaphores[currentFrame];

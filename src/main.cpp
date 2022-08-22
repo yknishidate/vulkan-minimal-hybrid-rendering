@@ -10,8 +10,6 @@
 #include <stdexcept>
 #include <algorithm>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -310,12 +308,6 @@ private:
     AccelerationStructure topLevelAS;
 
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
-
-    //std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
-    //std::vector<vk::UniqueSemaphore> renderFinishedSemaphores;
-    //std::vector<vk::Fence> inFlightFences;
-    //std::vector<vk::Fence> imagesInFlight;
-    //size_t currentFrame = 0;
 
     void cleanup()
     {

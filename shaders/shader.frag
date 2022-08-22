@@ -16,7 +16,7 @@ void main() {
     outColor = vec4(colors[inMeshIndex] * lighting, 1.0);
 
     rayQueryEXT rayQuery;
-	rayQueryInitializeEXT(
+    rayQueryInitializeEXT(
         rayQuery,
         topLevelAS,
         gl_RayFlagsTerminateOnFirstHitEXT, // rayFlags
@@ -26,8 +26,8 @@ void main() {
         lightDir,                          // direction
         100.0                              // tMax
     );
-	while (rayQueryProceedEXT(rayQuery)) { }
-	if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT ) {
-		outColor *= 0.2;
-	}
+    while (rayQueryProceedEXT(rayQuery)) { }
+    if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT ) {
+        outColor *= 0.2;
+    }
 }

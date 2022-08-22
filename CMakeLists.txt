@@ -10,12 +10,10 @@ add_executable(${PROJECT_NAME} ${sources})
 
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-find_package(tinyobjloader CONFIG REQUIRED)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC 
     glfw
     glm::glm
-    tinyobjloader::tinyobjloader
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

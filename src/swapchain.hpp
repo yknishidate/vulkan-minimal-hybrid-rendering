@@ -8,8 +8,8 @@ struct Swapchain
     {
         // Create swapchain
         {
-            extent.width = static_cast<uint32_t>(Window::getWidth());
-            extent.height = static_cast<uint32_t>(Window::getHeight());
+            extent.width = static_cast<uint32_t>(Window::width);
+            extent.height = static_cast<uint32_t>(Window::height);
 
             vk::SwapchainCreateInfoKHR swapchainInfo{};
             swapchainInfo.setSurface(Context::surface);
@@ -124,8 +124,8 @@ struct Swapchain
                 vk::FramebufferCreateInfo framebufferInfo;
                 framebufferInfo.setRenderPass(*renderPass);
                 framebufferInfo.setAttachments(attachments);
-                framebufferInfo.setWidth(static_cast<uint32_t>(Window::getWidth()));
-                framebufferInfo.setHeight(static_cast<uint32_t>(Window::getHeight()));
+                framebufferInfo.setWidth(static_cast<uint32_t>(Window::width));
+                framebufferInfo.setHeight(static_cast<uint32_t>(Window::height));
                 framebufferInfo.setLayers(1);
                 framebuffers.push_back(Context::device.createFramebufferUnique(framebufferInfo));
             }

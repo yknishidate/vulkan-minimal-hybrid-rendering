@@ -47,16 +47,6 @@ struct Window
         return surface;
     }
 
-    static int getWidth()
-    {
-        return width;
-    }
-
-    static int getHeight()
-    {
-        return height;
-    }
-
     static inline GLFWwindow* window;
     static inline int width;
     static inline int height;

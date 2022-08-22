@@ -5,8 +5,6 @@
 
 #include "swapchain.hpp"
 
-using vkIL = vk::ImageLayout;
-using vkA = vk::AccessFlagBits;
 using vkBU = vk::BufferUsageFlagBits;
 using vkMP = vk::MemoryPropertyFlagBits;
 using vkDT = vk::DescriptorType;
@@ -348,8 +346,8 @@ private:
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
         inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
 
-        float width = static_cast<float>(Window::getWidth());
-        float height = static_cast<float>(Window::getHeight());
+        float width = static_cast<float>(Window::width);
+        float height = static_cast<float>(Window::height);
         vk::Viewport viewport{ 0.0f, 0.0f, width, height, 0.0f, 1.0f };
         vk::Rect2D scissor{ { 0, 0 }, swapchain.extent };
         vk::PipelineViewportStateCreateInfo viewportState{ {}, 1, &viewport, 1, &scissor };
@@ -443,7 +441,7 @@ private:
         float angle = frame * glm::radians(1.0f);
         glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f));
         glm::vec3 camPos = glm::vec3(rotate * glm::vec4(12.0f, -12.0f, 12.0f, 1.0f));
-        float aspect = Window::getWidth() / static_cast<float>(Window::getHeight());
+        float aspect = Window::width / static_cast<float>(Window::height);
 
         UniformBufferObject ubo;
         ubo.model = glm::mat4{ 1.0f };
@@ -535,7 +533,7 @@ private:
 
         vk::RenderPassBeginInfo renderPassInfo;
         renderPassInfo.setRenderPass(*swapchain.renderPass);
-        renderPassInfo.setRenderArea({ {0, 0}, {static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight())} });
+        renderPassInfo.setRenderArea({ {0, 0}, swapchain.extent });
         renderPassInfo.setClearValues(clearValues);
         for (size_t i = 0; i < commandBuffers.size(); i++) {
             renderPassInfo.setFramebuffer(*swapchain.framebuffers[i]);

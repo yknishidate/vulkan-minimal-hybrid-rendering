@@ -15,15 +15,25 @@ A minimal hybrid rendering sample using ray query
 - GPU / Driver that support Vulkan Ray Query
 - C++ 17
 
-## Library
-- GLFW
-- GLM
+## Clone
 
-## Setup
+```sh
+git clone --recursive https://github.com/yknishidate/vulkan-minimal-hybrid-rendering
+cd vulkan-minimal-hybrid-rendering
+```
 
-See [Vulkan Tutorial / Development environment](https://vulkan-tutorial.com/Development_environment)
+## Build
 
-## References
+```sh
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
 
--   [Vulkan Tutorial](https://vulkan-tutorial.com/)
--   [SaschaWillems/Vulkan](https://github.com/SaschaWillems/Vulkan)
+## Run
+
+```sh
+# on Windows
+Debug\vulkan_minimal_hybrid_rendering.exe
+```

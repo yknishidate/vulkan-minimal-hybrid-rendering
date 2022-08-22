@@ -89,28 +89,31 @@ struct Swapchain
 
         // Create depth image
         {
-            vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-            vk::Format format = vk::Format::eD32Sfloat;
-
             vk::ImageCreateInfo createInfo;
             createInfo.setImageType(vk::ImageType::e2D);
             createInfo.setExtent({ extent.width, extent.height, 1 });
             createInfo.setMipLevels(1);
             createInfo.setArrayLayers(1);
-            createInfo.setFormat(format);
+            createInfo.setFormat(vk::Format::eD32Sfloat);
             createInfo.setTiling(vk::ImageTiling::eOptimal);
-            createInfo.setUsage(usage);
+            createInfo.setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment);
             depthImage = Context::device.createImageUnique(createInfo);
+        }
 
+        // Allocate memory
+        {
             vk::MemoryRequirements requirements = Context::device.getImageMemoryRequirements(*depthImage);
             uint32_t memoryTypeIndex = Context::findMemoryType(requirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
             depthImageMemory = Context::device.allocateMemoryUnique({ requirements.size, memoryTypeIndex });
             Context::device.bindImageMemory(*depthImage, *depthImageMemory, 0);
+        }
 
+        // Create depth image view
+        {
             vk::ImageViewCreateInfo viewInfo;
             viewInfo.setImage(*depthImage);
             viewInfo.setViewType(vk::ImageViewType::e2D);
-            viewInfo.setFormat(format);
+            viewInfo.setFormat(vk::Format::eD32Sfloat);
             viewInfo.setSubresourceRange({ vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1 });
             depthImageView = Context::device.createImageViewUnique(viewInfo);
         }

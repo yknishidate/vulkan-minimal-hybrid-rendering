@@ -15,7 +15,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "context.hpp"
+#include "swapchain.hpp"
 
 using vkIL = vk::ImageLayout;
 using vkA = vk::AccessFlagBits;
@@ -344,6 +344,7 @@ public:
     }
 
 private:
+    Swapchain swapchain;
     std::vector<vk::UniqueFramebuffer> swapchainFramebuffers;
     Image depthImage;
 
@@ -529,9 +530,9 @@ private:
 
     void createFramebuffers()
     {
-        swapchainFramebuffers.reserve(Context::swapchainImageViews.size());
-        for (auto const& view : Context::swapchainImageViews) {
-            std::array attachments{ view, *depthImage.view };
+        swapchainFramebuffers.reserve(swapchain.imageCount);
+        for (auto const& view : swapchain.imageViews) {
+            std::array attachments{ *view, *depthImage.view };
             vk::FramebufferCreateInfo framebufferInfo;
             framebufferInfo.setRenderPass(*renderPass);
             framebufferInfo.setAttachments(attachments);
@@ -724,7 +725,7 @@ private:
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-        imagesInFlight.resize(Context::swapchainImages.size());
+        imagesInFlight.resize(swapchain.imageCount);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             imageAvailableSemaphores[i] = Context::device.createSemaphoreUnique({});
@@ -736,7 +737,7 @@ private:
     uint32_t acquireNextImage(size_t currentFrame)
     {
         vk::Semaphore semaphore = *imageAvailableSemaphores[currentFrame];
-        auto result = Context::device.acquireNextImageKHR(Context::swapchain, UINT64_MAX, semaphore);
+        auto result = Context::device.acquireNextImageKHR(*swapchain.swapchain, UINT64_MAX, semaphore);
         if (result.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to acquire next image!");
         }
@@ -767,7 +768,7 @@ private:
         submitInfo.setSignalSemaphores(renderFinishedSemaphore);
         Context::queue.submit(submitInfo, inFlightFences[currentFrame]);
 
-        vk::PresentInfoKHR presentInfo{ renderFinishedSemaphore, Context::swapchain, imageIndex };
+        vk::PresentInfoKHR presentInfo{ renderFinishedSemaphore, *swapchain.swapchain, imageIndex };
         Context::queue.presentKHR(presentInfo);
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;

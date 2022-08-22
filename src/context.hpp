@@ -117,38 +117,6 @@ struct Context
             poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
             descriptorPool = device.createDescriptorPool(poolInfo);
         }
-
-        // Create swapchain
-        {
-            vk::SwapchainCreateInfoKHR swapchainInfo{};
-            swapchainInfo.setSurface(surface);
-            swapchainInfo.setMinImageCount(3);
-            swapchainInfo.setImageFormat(vk::Format::eB8G8R8A8Unorm);
-            swapchainInfo.setImageColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
-            swapchainInfo.setImageExtent({static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight())});
-            swapchainInfo.setImageArrayLayers(1);
-            swapchainInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
-            swapchainInfo.setPreTransform(vk::SurfaceTransformFlagBitsKHR::eIdentity);
-            swapchainInfo.setPresentMode(vk::PresentModeKHR::eFifo);
-            swapchainInfo.setClipped(true);
-            swapchain = device.createSwapchainKHR(swapchainInfo);
-        }
-
-        // Create swapchain image views
-        {
-            swapchainImages = device.getSwapchainImagesKHR(swapchain);
-            swapchainImageViews.resize(swapchainImages.size());
-
-            vk::ImageSubresourceRange subresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
-            for (size_t i = 0; i < swapchainImages.size(); i++) {
-                vk::ImageViewCreateInfo createInfo;
-                createInfo.setImage(swapchainImages[i]);
-                createInfo.setViewType(vk::ImageViewType::e2D);
-                createInfo.setFormat(vk::Format::eB8G8R8A8Unorm);
-                createInfo.setSubresourceRange(subresourceRange);
-                swapchainImageViews[i] = device.createImageView(createInfo);
-            }
-        }
     }
 
     static uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
@@ -185,24 +153,11 @@ struct Context
 
     static vk::UniqueDescriptorSet allocateDescSet(vk::DescriptorSetLayout descSetLayout)
     {
-        return std::move(device.allocateDescriptorSetsUnique({ descriptorPool, descSetLayout}).front());
-    }
-
-    static uint32_t acquireNextImage(vk::Semaphore semaphore)
-    {
-        auto res = device.acquireNextImageKHR(swapchain, UINT64_MAX, semaphore);
-        if (res.result != vk::Result::eSuccess) {
-            throw std::runtime_error("failed to acquire next image!");
-        }
-        return res.value;
+        return std::move(device.allocateDescriptorSetsUnique({ descriptorPool, descSetLayout }).front());
     }
 
     static void terminate()
     {
-        for(auto view: swapchainImageViews) {
-            device.destroyImageView(view);
-        }
-        device.destroySwapchainKHR(swapchain);
         device.destroyDescriptorPool(descriptorPool);
         device.destroyCommandPool(commandPool);
         device.destroy();
@@ -220,8 +175,4 @@ struct Context
     static inline vk::Queue queue;
     static inline vk::CommandPool commandPool;
     static inline vk::DescriptorPool descriptorPool;
-
-    static inline vk::SwapchainKHR swapchain;
-    static inline std::vector<vk::Image> swapchainImages;
-    static inline std::vector<vk::ImageView> swapchainImageViews;
 };

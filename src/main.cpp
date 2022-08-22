@@ -23,8 +23,6 @@ using vkBU = vk::BufferUsageFlagBits;
 using vkMP = vk::MemoryPropertyFlagBits;
 using vkDT = vk::DescriptorType;
 
-const int MAX_FRAMES_IN_FLIGHT = 2;
-
 struct Vertex
 {
     glm::vec3 pos;
@@ -187,7 +185,7 @@ struct AccelerationStructure
 {
     vk::UniqueAccelerationStructureKHR handle;
     Buffer buffer;
-    
+
     vk::AccelerationStructureTypeKHR type;
     uint32_t primitiveCount;
     vk::DeviceSize size;
@@ -225,9 +223,9 @@ struct AccelerationStructure
 
         vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{ primitiveCount , 0, 0, 0 };
         Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer)
-        {
-            commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
-        });
+                               {
+                                   commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
+                               });
     }
 
     vk::WriteDescriptorSet createDescWrite(vk::DescriptorSet& descSet, uint32_t binding)
@@ -264,7 +262,6 @@ public:
         createTopLevelAS();
         createDescriptorSets();
         createCommandBuffers();
-        createSyncObjects();
     }
 
     void mainLoop()
@@ -314,17 +311,14 @@ private:
 
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
 
-    std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
-    std::vector<vk::UniqueSemaphore> renderFinishedSemaphores;
-    std::vector<vk::Fence> inFlightFences;
-    std::vector<vk::Fence> imagesInFlight;
-    size_t currentFrame = 0;
+    //std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
+    //std::vector<vk::UniqueSemaphore> renderFinishedSemaphores;
+    //std::vector<vk::Fence> inFlightFences;
+    //std::vector<vk::Fence> imagesInFlight;
+    //size_t currentFrame = 0;
 
     void cleanup()
     {
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            Context::device.destroyFence(inFlightFences[i]);
-        }
         Window::terminate();
     }
 
@@ -341,8 +335,8 @@ private:
     {
         using vkSS = vk::ShaderStageFlagBits;
         std::vector<vk::DescriptorSetLayoutBinding> bindings;
-        bindings.push_back({ 0, vkDT::eUniformBuffer, 1, vkSS::eVertex });
-        bindings.push_back({ 1, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment });
+        bindings.emplace_back(0, vkDT::eUniformBuffer, 1, vkSS::eVertex);
+        bindings.emplace_back(1, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment);
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo;
         layoutInfo.setBindings(bindings);
@@ -504,9 +498,12 @@ private:
 
     void createTopLevelAS()
     {
-        VkTransformMatrixKHR transformMatrix = { 1.0f, 0.0f, 0.0f, 0.0f,
-                                                 0.0f, 1.0f, 0.0f, 0.0f,
-                                                 0.0f, 0.0f, 1.0f, 0.0f };
+        vk::TransformMatrixKHR transformMatrix = std::array{
+            std::array{1.0f, 0.0f, 0.0f, 0.0f},
+            std::array{0.0f, 1.0f, 0.0f, 0.0f},
+            std::array{0.0f, 0.0f, 1.0f, 0.0f}
+        };
+
         vk::AccelerationStructureInstanceKHR asInstance;
         asInstance.setTransform(transformMatrix);
         asInstance.setMask(0xFF);
@@ -533,11 +530,11 @@ private:
                                             vk::AccelerationStructureTypeKHR::eTopLevel,
                                             primitiveCount };
     }
-    
+
     void createDescriptorSets()
     {
         descriptorSet = Context::allocateDescSet(*descriptorSetLayout);
-        
+
         std::vector descriptorWrites{
             uniformBuffer.createDescWrite(*descriptorSet, vkDT::eUniformBuffer, 0),
             topLevelAS.createDescWrite(*descriptorSet, 1)
@@ -578,58 +575,12 @@ private:
         }
     }
 
-    void createSyncObjects()
-    {
-        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-        imagesInFlight.resize(swapchain.imageCount);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            imageAvailableSemaphores[i] = Context::device.createSemaphoreUnique({});
-            renderFinishedSemaphores[i] = Context::device.createSemaphoreUnique({});
-            inFlightFences[i] = Context::device.createFence({ vk::FenceCreateFlagBits::eSignaled });
-        }
-    }
-
-    uint32_t acquireNextImage(size_t currentFrame)
-    {
-        vk::Semaphore semaphore = *imageAvailableSemaphores[currentFrame];
-        auto result = Context::device.acquireNextImageKHR(*swapchain.swapchain, UINT64_MAX, semaphore);
-        if (result.result != vk::Result::eSuccess) {
-            throw std::runtime_error("failed to acquire next image!");
-        }
-        return result.value;
-    }
-
     void drawFrame()
     {
-        Context::device.waitForFences(inFlightFences[currentFrame], true, UINT64_MAX);
-        Context::device.resetFences(inFlightFences[currentFrame]);
-
-        uint32_t imageIndex = acquireNextImage(currentFrame);
-        if (imagesInFlight[imageIndex]) {
-            Context::device.waitForFences(imagesInFlight[imageIndex], true, UINT64_MAX);
-        }
-        imagesInFlight[imageIndex] = inFlightFences[currentFrame];
-        Context::device.resetFences(inFlightFences[currentFrame]);
-
+        uint32_t imageIndex = swapchain.acquireNextImage();
         updateUniformBuffer();
-
-        vk::PipelineStageFlags waitStage{ vk::PipelineStageFlagBits::eColorAttachmentOutput };
-        vk::Semaphore imageAvailableSemaphore = *imageAvailableSemaphores[currentFrame];
-        vk::Semaphore renderFinishedSemaphore = *renderFinishedSemaphores[currentFrame];
-        vk::SubmitInfo submitInfo;
-        submitInfo.setWaitSemaphores(imageAvailableSemaphore);
-        submitInfo.setWaitDstStageMask(waitStage);
-        submitInfo.setCommandBuffers(*commandBuffers[imageIndex]);
-        submitInfo.setSignalSemaphores(renderFinishedSemaphore);
-        Context::queue.submit(submitInfo, inFlightFences[currentFrame]);
-
-        vk::PresentInfoKHR presentInfo{ renderFinishedSemaphore, *swapchain.swapchain, imageIndex };
-        Context::queue.presentKHR(presentInfo);
-
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        swapchain.submit(*commandBuffers[imageIndex]);
+        swapchain.present(imageIndex);
     }
 
     static std::vector<char> readFile(const std::string& filename)

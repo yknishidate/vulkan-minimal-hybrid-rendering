@@ -132,16 +132,54 @@ struct Swapchain
                 framebuffers.push_back(Context::device.createFramebufferUnique(framebufferInfo));
             }
         }
+
+        // Create sync objects
+        {
+            imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+            renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+            inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                imageAvailableSemaphores[i] = Context::device.createSemaphoreUnique({});
+                renderFinishedSemaphores[i] = Context::device.createSemaphoreUnique({});
+                inFlightFences[i] = Context::device.createFenceUnique({ vk::FenceCreateFlagBits::eSignaled });
+            }
+        }
     }
 
-    uint32_t acquireNextImage(vk::Semaphore semaphore)
+    uint32_t acquireNextImage()
     {
-        auto result = Context::device.acquireNextImageKHR(*swapchain, UINT64_MAX, semaphore);
+        Context::device.waitForFences(*inFlightFences[currentFrame], true, UINT64_MAX);
+        Context::device.resetFences(*inFlightFences[currentFrame]);
+        auto result = Context::device.acquireNextImageKHR(*swapchain, UINT64_MAX, *imageAvailableSemaphores[currentFrame]);
         if (result.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to acquire next image!");
         }
         return result.value;
     }
+
+    void submit(vk::CommandBuffer commandBuffer)
+    {
+        vk::PipelineStageFlags waitStage{ vk::PipelineStageFlagBits::eColorAttachmentOutput };
+
+        vk::SubmitInfo submitInfo;
+        submitInfo.setWaitSemaphores(*imageAvailableSemaphores[currentFrame]);
+        submitInfo.setWaitDstStageMask(waitStage);
+        submitInfo.setCommandBuffers(commandBuffer);
+        submitInfo.setSignalSemaphores(*renderFinishedSemaphores[currentFrame]);
+
+        Context::queue.submit(submitInfo, *inFlightFences[currentFrame]);
+    }
+
+    void present(uint32_t imageIndex)
+    {
+        vk::PresentInfoKHR presentInfo{ *renderFinishedSemaphores[currentFrame], *swapchain, imageIndex };
+        Context::queue.presentKHR(presentInfo);
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    const int MAX_FRAMES_IN_FLIGHT = 2;
 
     vk::Extent2D extent;
     uint32_t imageCount;
@@ -155,4 +193,9 @@ struct Swapchain
     vk::UniqueImage depthImage;
     vk::UniqueImageView depthImageView;
     vk::UniqueDeviceMemory depthImageMemory;
+
+    std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
+    std::vector<vk::UniqueSemaphore> renderFinishedSemaphores;
+    std::vector<vk::UniqueFence> inFlightFences;
+    size_t currentFrame = 0;
 };

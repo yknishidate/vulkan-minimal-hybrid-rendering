@@ -2,10 +2,6 @@
 
 #include "buffer.hpp"
 
-using vkBU = vk::BufferUsageFlagBits;
-using vkMP = vk::MemoryPropertyFlagBits;
-using vkDT = vk::DescriptorType;
-
 struct AccelerationStructure
 {
     vk::UniqueAccelerationStructureKHR accel;

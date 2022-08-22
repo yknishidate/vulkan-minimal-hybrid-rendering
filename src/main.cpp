@@ -2,10 +2,6 @@
 #include "scene.hpp"
 #include "swapchain.hpp"
 
-using vkBU = vk::BufferUsageFlagBits;
-using vkMP = vk::MemoryPropertyFlagBits;
-using vkDT = vk::DescriptorType;
-
 struct UniformBufferObject
 {
     glm::mat4 model;
@@ -229,15 +225,9 @@ private:
             commandBuffers[i]->begin(vk::CommandBufferBeginInfo{});
             commandBuffers[i]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-
-            //vk::DeviceSize offsets{ 0 };
-            //commandBuffers[i]->bindVertexBuffers(0, *vertexBuffer.buffer, offsets);
-            //commandBuffers[i]->bindIndexBuffer(*indexBuffer.buffer, 0, vk::IndexType::eUint16);
             commandBuffers[i]->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                                   *pipelineLayout, 0, *descriptorSet, nullptr);
             scene.draw(*commandBuffers[i]);
-            //commandBuffers[i]->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
             commandBuffers[i]->endRenderPass();
             commandBuffers[i]->end();
         }

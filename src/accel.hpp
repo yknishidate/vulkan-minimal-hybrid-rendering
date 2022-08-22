@@ -6,12 +6,6 @@ struct AccelerationStructure
 {
     vk::UniqueAccelerationStructureKHR accel;
     Buffer buffer;
-
-    vk::AccelerationStructureTypeKHR type;
-    uint32_t primitiveCount;
-    vk::DeviceSize size;
-    vk::AccelerationStructureBuildGeometryInfoKHR geometryInfo;
-    uint64_t deviceAddress;
     vk::WriteDescriptorSetAccelerationStructureKHR asInfo;
 
     AccelerationStructure() = default;
@@ -20,16 +14,14 @@ struct AccelerationStructure
                           vk::AccelerationStructureTypeKHR type,
                           uint32_t primitiveCount)
     {
-        this->type = type;
-        this->primitiveCount = primitiveCount;
-
+        vk::AccelerationStructureBuildGeometryInfoKHR geometryInfo;
         geometryInfo.setType(type);
         geometryInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
         geometryInfo.setGeometries(geometry);
 
         vk::AccelerationStructureBuildSizesInfoKHR buildSizesInfo =
             Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
-        size = buildSizesInfo.accelerationStructureSize;
+        vk::DeviceSize size = buildSizesInfo.accelerationStructureSize;
         buffer = Buffer{ size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
 
         vk::AccelerationStructureCreateInfoKHR createInfo;

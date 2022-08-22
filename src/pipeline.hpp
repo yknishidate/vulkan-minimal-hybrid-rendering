@@ -136,7 +136,7 @@ struct GraphicsPipeline
             if (result.result != vk::Result::eSuccess) {
                 throw std::runtime_error("failed to create a pipeline!");
             }
-            graphicsPipeline = std::move(result.value);
+            pipeline = std::move(result.value);
         }
     }
 
@@ -150,7 +150,7 @@ struct GraphicsPipeline
 
     void bind(vk::CommandBuffer commandBuffer)
     {
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                          *pipelineLayout, 0, *descriptorSet, nullptr);
     }
@@ -159,5 +159,5 @@ struct GraphicsPipeline
     vk::UniqueDescriptorSet descriptorSet;
 
     vk::UniquePipelineLayout pipelineLayout;
-    vk::UniquePipeline graphicsPipeline;
+    vk::UniquePipeline pipeline;
 };

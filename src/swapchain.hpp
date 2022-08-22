@@ -136,11 +136,11 @@ struct Swapchain
 
     uint32_t acquireNextImage(vk::Semaphore semaphore)
     {
-        auto res = Context::device.acquireNextImageKHR(*swapchain, UINT64_MAX, semaphore);
-        if (res.result != vk::Result::eSuccess) {
+        auto result = Context::device.acquireNextImageKHR(*swapchain, UINT64_MAX, semaphore);
+        if (result.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to acquire next image!");
         }
-        return res.value;
+        return result.value;
     }
 
     vk::Extent2D extent;

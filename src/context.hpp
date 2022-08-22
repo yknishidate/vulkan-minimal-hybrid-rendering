@@ -145,7 +145,7 @@ struct Context
             poolInfo.setPoolSizes(poolSizes);
             poolInfo.setMaxSets(3);
             poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-            descPool = device.createDescriptorPool(poolInfo);
+            descriptorPool = device.createDescriptorPool(poolInfo);
         }
     }
 
@@ -183,7 +183,7 @@ struct Context
 
     static vk::UniqueDescriptorSet allocateDescSet(vk::DescriptorSetLayout descSetLayout)
     {
-        return std::move(device.allocateDescriptorSetsUnique({descPool, descSetLayout}).front());
+        return std::move(device.allocateDescriptorSetsUnique({ descriptorPool, descSetLayout}).front());
     }
 
     static uint32_t acquireNextImage(vk::Semaphore semaphore)
@@ -197,7 +197,7 @@ struct Context
 
     static void terminate()
     {
-        device.destroyDescriptorPool(descPool);
+        device.destroyDescriptorPool(descriptorPool);
         for(auto view: swapchainImageViews) {
             device.destroyImageView(view);
         }
@@ -220,5 +220,5 @@ struct Context
     static inline vk::SwapchainKHR swapchain;
     static inline std::vector<vk::Image> swapchainImages;
     static inline std::vector<vk::ImageView> swapchainImageViews;
-    static inline vk::DescriptorPool descPool;
+    static inline vk::DescriptorPool descriptorPool;
 };

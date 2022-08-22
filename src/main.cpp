@@ -738,7 +738,7 @@ private:
     {
         std::vector layouts{ Context::swapchainImages.size(), *descriptorSetLayout };
         vk::DescriptorSetAllocateInfo allocInfo;
-        allocInfo.setDescriptorPool(Context::descPool);
+        allocInfo.setDescriptorPool(Context::descriptorPool);
         allocInfo.setSetLayouts(layouts);
 
         descriptorSets.resize(Context::swapchainImages.size());

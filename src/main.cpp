@@ -14,9 +14,10 @@
 #include <stdexcept>
 #include <algorithm>
 #include <vulkan/vulkan.hpp>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include "window.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -425,14 +426,6 @@ struct UniformBufferObject
 class Application
 {
 public:
-    void initWindow(uint32_t width, uint32_t height)
-    {
-        glfwInit();
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-        window = glfwCreateWindow(width, height, "Vulkan", nullptr, nullptr);
-    }
-
     void initVulkan()
     {
         createInstance();
@@ -461,8 +454,8 @@ public:
 
     void mainLoop()
     {
-        while (!glfwWindowShouldClose(window)) {
-            glfwPollEvents();
+        while (!Window::shouldClose()) {
+            Window::pollEvents();
             drawFrame();
         }
         device->waitIdle();
@@ -486,8 +479,6 @@ public:
     }
 
 private:
-    GLFWwindow* window;
-
     vk::UniqueInstance instance;
     vk::UniqueDebugUtilsMessengerEXT debugMessenger;
     vk::UniqueSurfaceKHR surface;
@@ -540,8 +531,7 @@ private:
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device->destroyFence(inFlightFences[i]);
         }
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        Window::terminate();
     }
 
     void createInstance()
@@ -581,11 +571,7 @@ private:
 
     void createSurface()
     {
-        VkSurfaceKHR _surface;
-        VkInstance _instance = *instance;
-        if (glfwCreateWindowSurface(_instance, window, nullptr, &_surface) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create window surface!");
-        }
+        VkSurfaceKHR _surface = Window::createSurface(*instance);
         surface = vk::UniqueSurfaceKHR(vk::SurfaceKHR(_surface), { *instance });
     }
 
@@ -1192,8 +1178,8 @@ private:
         if (capabilities.currentExtent.width != UINT32_MAX) {
             return capabilities.currentExtent;
         } else {
-            int width, height;
-            glfwGetFramebufferSize(window, &width, &height);
+            int width = Window::getWidth();
+            int height = Window::getHeight();
             vk::Extent2D actualExtent{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
             vk::Extent2D minExtent = capabilities.minImageExtent;
             vk::Extent2D maxExtent = capabilities.maxImageExtent;
@@ -1311,15 +1297,15 @@ private:
 int main()
 {
     Mesh mesh;
-    mesh.load("assets/bunny_and_teapot.obj");
+    mesh.load("../assets/bunny_and_teapot.obj");
 
     Application app;
-    app.setVertShaderPath("shaders/spv/shader.vert.spv");
-    app.setFragShaderPath("shaders/spv/shader.frag.spv");
+    app.setVertShaderPath("../shaders/spv/shader.vert.spv");
+    app.setFragShaderPath("../shaders/spv/shader.frag.spv");
     app.setMesh(mesh);
 
     try {
-        app.initWindow(1000, 800);
+        Window::init(1000, 800);
         app.initVulkan();
         app.mainLoop();
     } catch (const std::exception& e) {

@@ -173,6 +173,26 @@ struct Swapchain
         currentFrame = (currentFrame + 1) % maxFramesCount;
     }
 
+    void beginRenderPass(vk::CommandBuffer commandBuffer, uint32_t imageIndex)
+    {
+        std::array<vk::ClearValue, 2> clearValues;
+        clearValues[0].color = { std::array{0.0f, 0.0f, 0.0f, 1.0f} };
+        clearValues[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
+
+        vk::RenderPassBeginInfo renderPassInfo;
+        renderPassInfo.setRenderPass(*renderPass);
+        renderPassInfo.setRenderArea({ {0, 0}, extent });
+        renderPassInfo.setClearValues(clearValues);
+
+        renderPassInfo.setFramebuffer(*framebuffers[imageIndex]);
+        commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+    }
+
+    void endRenderPass(vk::CommandBuffer commandBuffer)
+    {
+        commandBuffer.endRenderPass();
+    }
+
     const uint32_t maxFramesCount = 2;
     const uint32_t imageCount = 3;
 

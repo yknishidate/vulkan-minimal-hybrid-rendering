@@ -62,24 +62,12 @@ int main()
             allocInfo.setCommandBufferCount(static_cast<uint32_t>(swapchain.framebuffers.size()));
 
             std::vector commandBuffers = Context::device.allocateCommandBuffersUnique(allocInfo);
-
-            std::array<vk::ClearValue, 2> clearValues;
-            clearValues[0].color = { std::array{0.0f, 0.0f, 0.0f, 1.0f} };
-            clearValues[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
-
-            vk::RenderPassBeginInfo renderPassInfo;
-            renderPassInfo.setRenderPass(*swapchain.renderPass);
-            renderPassInfo.setRenderArea({ {0, 0}, swapchain.extent });
-            renderPassInfo.setClearValues(clearValues);
             for (size_t i = 0; i < commandBuffers.size(); i++) {
-                renderPassInfo.setFramebuffer(*swapchain.framebuffers[i]);
                 commandBuffers[i]->begin(vk::CommandBufferBeginInfo{});
-                commandBuffers[i]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-
+                swapchain.beginRenderPass(*commandBuffers[i], i);
                 pipeline.bind(*commandBuffers[i]);
                 scene.draw(*commandBuffers[i]);
-
-                commandBuffers[i]->endRenderPass();
+                swapchain.endRenderPass(*commandBuffers[i]);
                 commandBuffers[i]->end();
             }
 
@@ -91,7 +79,6 @@ int main()
                 ubo.update();
                 uniformBuffer.copy(&ubo);
 
-                //updateUniformBuffer();
                 swapchain.submit(*commandBuffers[imageIndex]);
                 swapchain.present(imageIndex);
             }

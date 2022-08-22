@@ -32,8 +32,6 @@ struct GraphicsPipeline
 {
     using vkDT = vk::DescriptorType;
 
-    GraphicsPipeline() = default; // TODO: remove
-
     GraphicsPipeline(const std::string& vertShaderPath,
                      const std::string& fragShaderPath,
                      vk::Extent2D extent,

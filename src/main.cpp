@@ -74,8 +74,8 @@ struct Buffer
 
     Buffer(vk::DeviceSize size, vk::BufferUsageFlags usage,
            vk::MemoryPropertyFlags properties)
+        : size{ size }
     {
-        this->size = size;
         buffer = Context::device.createBufferUnique({ {}, size, usage });
 
         vk::MemoryRequirements requirements = Context::device.getBufferMemoryRequirements(*buffer);
@@ -148,7 +148,7 @@ struct Mesh
         std::vector<glm::vec3> normals;
         std::vector<std::pair<int, int>> verts;
 
-        uint16_t currentMeshIndex = 0;
+        uint16_t currentMeshIndex = -1;
         while (std::getline(file, line)) {
             std::vector<std::string> list = split(line, ' ');
             if (list[0] == "v") {
@@ -158,9 +158,7 @@ struct Mesh
                 normals.push_back(glm::vec3(stof(list[1]), -stof(list[2]), stof(list[3])));
             }
             if (list[0] == "o") {
-                if (list[1] == "Teapot") currentMeshIndex = 0;
-                if (list[1] == "Floor") currentMeshIndex = 1;
-                if (list[1] == "Bunny") currentMeshIndex = 2;
+                currentMeshIndex++;
             }
             if (list[0] == "f") {
                 for (int i = 1; i <= 3; i++) {
@@ -197,9 +195,11 @@ struct AccelerationStructure
     uint64_t deviceAddress;
     vk::WriteDescriptorSetAccelerationStructureKHR asInfo;
 
-    void createBuffer(vk::AccelerationStructureGeometryKHR geometry,
-                      vk::AccelerationStructureTypeKHR type,
-                      uint32_t primitiveCount)
+    AccelerationStructure() = default;
+
+    AccelerationStructure(vk::AccelerationStructureGeometryKHR geometry,
+                          vk::AccelerationStructureTypeKHR type,
+                          uint32_t primitiveCount)
     {
         this->type = type;
         this->primitiveCount = primitiveCount;
@@ -212,19 +212,13 @@ struct AccelerationStructure
             Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
         size = buildSizesInfo.accelerationStructureSize;
         buffer = Buffer{ size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
-    }
 
-    void create()
-    {
         vk::AccelerationStructureCreateInfoKHR createInfo;
         createInfo.setBuffer(*buffer.buffer);
         createInfo.setSize(size);
         createInfo.setType(type);
         handle = Context::device.createAccelerationStructureKHRUnique(createInfo);
-    }
 
-    void build()
-    {
         Buffer scratchBuffer{ size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
         geometryInfo.setScratchData(scratchBuffer.deviceAddress);
         geometryInfo.setDstAccelerationStructure(*handle);
@@ -326,7 +320,6 @@ private:
     std::vector<vk::Fence> imagesInFlight;
     size_t currentFrame = 0;
 
-
     void cleanup()
     {
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -382,7 +375,7 @@ private:
         float width = static_cast<float>(Window::getWidth());
         float height = static_cast<float>(Window::getHeight());
         vk::Viewport viewport{ 0.0f, 0.0f, width, height, 0.0f, 1.0f };
-        vk::Rect2D scissor{ { 0, 0 }, {static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight())} };
+        vk::Rect2D scissor{ { 0, 0 }, swapchain.extent };
         vk::PipelineViewportStateCreateInfo viewportState{ {}, 1, &viewport, 1, &scissor };
 
         vk::PipelineRasterizationStateCreateInfo rasterizer;
@@ -504,10 +497,9 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = indices.size() / 3;
-        bottomLevelAS.createBuffer(geometry,
-                                   vk::AccelerationStructureTypeKHR::eBottomLevel, primitiveCount);
-        bottomLevelAS.create();
-        bottomLevelAS.build();
+        bottomLevelAS = AccelerationStructure{ geometry,
+                                               vk::AccelerationStructureTypeKHR::eBottomLevel,
+                                               primitiveCount };
     }
 
     void createTopLevelAS()
@@ -537,10 +529,9 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = 1;
-        topLevelAS.createBuffer(geometry,
-                                vk::AccelerationStructureTypeKHR::eTopLevel, primitiveCount);
-        topLevelAS.create();
-        topLevelAS.build();
+        topLevelAS = AccelerationStructure{ geometry,
+                                            vk::AccelerationStructureTypeKHR::eTopLevel,
+                                            primitiveCount };
     }
     
     void createDescriptorSets()

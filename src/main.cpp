@@ -1,15 +1,5 @@
 
-#include <set>
-#include <array>
-#include <chrono>
-#include <cstdint>
-#include <cstdlib>
-#include <utility>
 #include <fstream>
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -448,23 +438,21 @@ private:
 
     void updateUniformBuffer()
     {
-        using namespace std::chrono;
-        static auto startTime = high_resolution_clock::now();
-        auto currentTime = high_resolution_clock::now();
-        float time = duration<float, seconds::period>(currentTime - startTime).count();
+        static uint64_t frame = 0;
 
-        float angle = time * glm::radians(60.0f);
+        float angle = frame * glm::radians(1.0f);
         glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f));
         glm::vec3 camPos = glm::vec3(rotate * glm::vec4(12.0f, -12.0f, 12.0f, 1.0f));
-        float aspect = Window::getWidth() / (float)Window::getHeight();
+        float aspect = Window::getWidth() / static_cast<float>(Window::getHeight());
 
         UniformBufferObject ubo;
-        ubo.model = glm::mat4(1.0f);
+        ubo.model = glm::mat4{ 1.0f };
         ubo.view = glm::lookAt(camPos, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
         ubo.proj[1][1] *= -1;
 
         uniformBuffer.copy(&ubo);
+        frame++;
     }
 
     void createBottomLevelAS()

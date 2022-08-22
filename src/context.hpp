@@ -110,11 +110,11 @@ struct Context
             swapchainInfo.setPresentMode(vk::PresentModeKHR::eFifo);
             swapchainInfo.setClipped(true);
             swapchain = device->createSwapchainKHRUnique(swapchainInfo);
-            swapchainImages = device->getSwapchainImagesKHR(*swapchain);
         }
 
         // Create swapchain image views
         {
+            swapchainImages = device->getSwapchainImagesKHR(*swapchain);
             swapchainImageViews.resize(swapchainImages.size());
 
             vk::ImageSubresourceRange subresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };

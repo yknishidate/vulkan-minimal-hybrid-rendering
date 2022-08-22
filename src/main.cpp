@@ -387,7 +387,7 @@ struct AccelerationStructure
         handle = device.createAccelerationStructureKHRUnique(createInfo);
     }
 
-    void build(vk::CommandBuffer commandBuffer)
+    void build()
     {
         Buffer scratchBuffer;
         scratchBuffer.create(device, size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress);
@@ -396,7 +396,10 @@ struct AccelerationStructure
         geometryInfo.setDstAccelerationStructure(*handle);
 
         vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{ primitiveCount , 0, 0, 0 };
-        commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
+        Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer)
+        {
+            commandBuffer.buildAccelerationStructuresKHR(geometryInfo, &rangeInfo);
+        });
     }
 
     vk::WriteDescriptorSet createDescWrite(vk::DescriptorSet& descSet, uint32_t binding)
@@ -514,7 +517,7 @@ private:
         colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
         vk::AttachmentDescription depthAttachment;
-        depthAttachment.setFormat(findDepthFormat());
+        depthAttachment.setFormat(vk::Format::eD32Sfloat);
         depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
         depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
         depthAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
@@ -625,9 +628,6 @@ private:
         colorBlending.setLogicOpEnable(VK_FALSE);
         colorBlending.setAttachments(colorBlendAttachment);
 
-        std::array dynamicStates{ vk::DynamicState::eViewport, vk::DynamicState::eLineWidth };
-        vk::PipelineDynamicStateCreateInfo dynamicState({}, dynamicStates);
-
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
         pipelineLayoutInfo.setSetLayouts(*descriptorSetLayout);
         pipelineLayout = Context::device->createPipelineLayoutUnique(pipelineLayoutInfo);
@@ -666,36 +666,11 @@ private:
             swapChainFramebuffers.push_back(Context::device->createFramebufferUnique(framebufferInfo));
         }
     }
-    
-    vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates,
-                                   vk::ImageTiling tiling, vk::FormatFeatureFlags features)
-    {
-        for (vk::Format format : candidates) {
-            vk::FormatProperties props = Context::physicalDevice.getFormatProperties(format);
-            if (tiling == vk::ImageTiling::eLinear &&
-                (props.linearTilingFeatures & features) == features) {
-                return format;
-            } else if (tiling == vk::ImageTiling::eOptimal &&
-                       (props.optimalTilingFeatures & features) == features) {
-                return format;
-            }
-        }
-        throw std::runtime_error("failed to find supported format!");
-    }
-
-    vk::Format findDepthFormat()
-    {
-        return findSupportedFormat(
-            { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
-            vk::ImageTiling::eOptimal,
-            vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-    }
 
     void createDepthResources()
     {
-        vk::Format depthFormat = findDepthFormat();
         vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        depthImage.create(*Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, depthFormat, usage);
+        depthImage.create(*Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
         depthImage.allocate(Context::physicalDevice);
         depthImage.createView(vk::ImageAspectFlagBits::eDepth);
 
@@ -781,10 +756,7 @@ private:
         bottomLevelAS.createBuffer(*Context::device, Context::physicalDevice, geometry,
                                    vk::AccelerationStructureTypeKHR::eBottomLevel, primitiveCount);
         bottomLevelAS.create();
-        Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer)
-        {
-            bottomLevelAS.build(commandBuffer);
-        });
+        bottomLevelAS.build();
     }
 
     void createTopLevelAS()
@@ -818,11 +790,7 @@ private:
         topLevelAS.createBuffer(*Context::device, Context::physicalDevice, geometry,
                                 vk::AccelerationStructureTypeKHR::eTopLevel, primitiveCount);
         topLevelAS.create();
-
-        Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer)
-        {
-            topLevelAS.build(commandBuffer);
-        });
+        topLevelAS.build();
     }
     
     void createDescriptorSets()
@@ -928,45 +896,6 @@ private:
         Context::queue.presentKHR(presentInfo);
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    vk::SurfaceFormatKHR chooseSwapSurfaceFormat(
-        const std::vector<vk::SurfaceFormatKHR>& availableFormats)
-    {
-        for (const auto& availableFormat : availableFormats) {
-            if (availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
-                availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-                return availableFormat;
-            }
-        }
-        return availableFormats[0];
-    }
-
-    vk::PresentModeKHR chooseSwapPresentMode(
-        const std::vector<vk::PresentModeKHR>& availablePresentModes)
-    {
-        for (const auto& availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == vk::PresentModeKHR::eFifoRelaxed) {
-                return availablePresentMode;
-            }
-        }
-        return vk::PresentModeKHR::eFifo;
-    }
-
-    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities)
-    {
-        if (capabilities.currentExtent.width != UINT32_MAX) {
-            return capabilities.currentExtent;
-        } else {
-            int width = Window::getWidth();
-            int height = Window::getHeight();
-            vk::Extent2D actualExtent{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
-            vk::Extent2D minExtent = capabilities.minImageExtent;
-            vk::Extent2D maxExtent = capabilities.maxImageExtent;
-            actualExtent.width = std::clamp(actualExtent.width, minExtent.width, maxExtent.width);
-            actualExtent.height = std::clamp(actualExtent.height, minExtent.height, maxExtent.height);
-            return actualExtent;
-        }
     }
 
     static std::vector<char> readFile(const std::string& filename)

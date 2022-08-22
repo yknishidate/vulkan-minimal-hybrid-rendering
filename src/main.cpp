@@ -8,7 +8,6 @@
 #include <cstdlib>
 #include <utility>
 #include <fstream>
-#include <optional>
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
@@ -61,19 +60,6 @@ struct Vertex
     }
 };
 
-uint32_t findMemoryType(vk::PhysicalDevice physicalDevice, uint32_t typeFilter,
-                        vk::MemoryPropertyFlags properties)
-{
-    vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) &&
-            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    throw std::runtime_error("failed to find suitable memory type!");
-}
-
 struct Buffer
 {
     vk::Device device;
@@ -93,10 +79,10 @@ struct Buffer
         buffer = device.createBufferUnique({ {}, size, usage });
     }
 
-    void allocate(vk::PhysicalDevice physicalDevice, vk::MemoryPropertyFlags properties)
+    void allocate(vk::MemoryPropertyFlags properties)
     {
         vk::MemoryRequirements requirements = device.getBufferMemoryRequirements(*buffer);
-        uint32_t type = findMemoryType(physicalDevice, requirements.memoryTypeBits, properties);
+        uint32_t type = Context::findMemoryType(requirements.memoryTypeBits, properties);
 
         vk::MemoryAllocateInfo allocInfo{ requirements.size, type };
         if (usage & vk::BufferUsageFlagBits::eShaderDeviceAddress) {
@@ -119,7 +105,7 @@ struct Buffer
         if (!mapped) {
             mapped = device.mapMemory(*memory, 0, size);
         }
-        memcpy(mapped, data, static_cast<size_t>(size));
+        memcpy(mapped, data, size);
     }
 
     vk::WriteDescriptorSet createDescWrite(const vk::DescriptorSet& descSet,
@@ -167,11 +153,11 @@ struct Image
         imageLayout = vkIL::eUndefined;
     }
 
-    void allocate(vk::PhysicalDevice physicalDevice)
+    void allocate()
     {
         vk::MemoryRequirements requirements = device.getImageMemoryRequirements(*image);
-        uint32_t memoryTypeIndex = findMemoryType(physicalDevice, requirements.memoryTypeBits,
-                                                  vk::MemoryPropertyFlagBits::eDeviceLocal);
+        uint32_t memoryTypeIndex = Context::findMemoryType(requirements.memoryTypeBits,
+                                                           vk::MemoryPropertyFlagBits::eDeviceLocal);
         memory = device.allocateMemoryUnique({ requirements.size, memoryTypeIndex });
         device.bindImageMemory(*image, *memory, 0);
     }
@@ -343,7 +329,7 @@ struct AccelerationStructure
             device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
         size = buildSizesInfo.accelerationStructureSize;
         buffer.create(device, size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress);
-        buffer.allocate(physicalDevice, vkMP::eDeviceLocal);
+        buffer.allocate(vkMP::eDeviceLocal);
     }
 
     void create()
@@ -359,7 +345,7 @@ struct AccelerationStructure
     {
         Buffer scratchBuffer;
         scratchBuffer.create(device, size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress);
-        scratchBuffer.allocate(physicalDevice, vkMP::eDeviceLocal);
+        scratchBuffer.allocate(vkMP::eDeviceLocal);
         geometryInfo.setScratchData(scratchBuffer.deviceAddress);
         geometryInfo.setDstAccelerationStructure(*handle);
 
@@ -639,7 +625,7 @@ private:
     {
         vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
         depthImage.create(Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
-        depthImage.allocate(Context::physicalDevice);
+        depthImage.allocate();
         depthImage.createView(vk::ImageAspectFlagBits::eDepth);
 
         Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer) {
@@ -657,7 +643,7 @@ private:
             vkBU::eShaderDeviceAddress |
             vkBU::eVertexBuffer };
         vertexBuffer.create(Context::device, size, usage);
-        vertexBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
+        vertexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         vertexBuffer.copy(vertices.data());
     }
 
@@ -670,7 +656,7 @@ private:
             vkBU::eShaderDeviceAddress |
             vkBU::eIndexBuffer };
         indexBuffer.create(Context::device, size, usage);
-        indexBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
+        indexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         indexBuffer.copy(indices.data());
     }
 
@@ -680,7 +666,7 @@ private:
         uniformBuffers.resize(Context::swapchainImages.size());
         for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
             uniformBuffers[i].create(Context::device, size, vk::BufferUsageFlagBits::eUniformBuffer);
-            uniformBuffers[i].allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
+            uniformBuffers[i].allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         }
     }
 
@@ -742,7 +728,7 @@ private:
         instancesBuffer.create(Context::device, sizeof(vk::AccelerationStructureInstanceKHR),
                                vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
                                vkBU::eShaderDeviceAddress);
-        instancesBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
+        instancesBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         instancesBuffer.copy(&asInstance);
 
         vk::AccelerationStructureGeometryInstancesDataKHR instancesData;

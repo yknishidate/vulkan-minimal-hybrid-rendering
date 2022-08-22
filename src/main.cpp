@@ -1,5 +1,3 @@
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include <set>
 #include <array>
@@ -11,6 +9,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -65,20 +66,18 @@ struct Buffer
     vk::UniqueBuffer buffer;
     vk::UniqueDeviceMemory memory;
     vk::DeviceSize size;
-    vk::BufferUsageFlags usage;
     uint64_t deviceAddress;
     vk::DescriptorBufferInfo bufferInfo;
     void* mapped = nullptr;
 
-    void create(vk::DeviceSize size, vk::BufferUsageFlags usage)
+    Buffer() = default;
+
+    Buffer(vk::DeviceSize size, vk::BufferUsageFlags usage,
+           vk::MemoryPropertyFlags properties)
     {
         this->size = size;
-        this->usage = usage;
         buffer = Context::device.createBufferUnique({ {}, size, usage });
-    }
 
-    void allocate(vk::MemoryPropertyFlags properties)
-    {
         vk::MemoryRequirements requirements = Context::device.getBufferMemoryRequirements(*buffer);
         uint32_t type = Context::findMemoryType(requirements.memoryTypeBits, properties);
 
@@ -119,7 +118,6 @@ struct Buffer
         return bufferWrite;
     }
 };
-
 
 struct Image
 {
@@ -257,8 +255,7 @@ struct AccelerationStructure
         vk::AccelerationStructureBuildSizesInfoKHR buildSizesInfo =
             Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
         size = buildSizesInfo.accelerationStructureSize;
-        buffer.create(size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress);
-        buffer.allocate(vkMP::eDeviceLocal);
+        buffer = Buffer{ size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
     }
 
     void create()
@@ -272,9 +269,7 @@ struct AccelerationStructure
 
     void build()
     {
-        Buffer scratchBuffer;
-        scratchBuffer.create(size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress);
-        scratchBuffer.allocate(vkMP::eDeviceLocal);
+        Buffer scratchBuffer{ size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress, vkMP::eDeviceLocal };
         geometryInfo.setScratchData(scratchBuffer.deviceAddress);
         geometryInfo.setDstAccelerationStructure(*handle);
 
@@ -587,8 +582,7 @@ private:
             vkBU::eShaderDeviceAddress |
             vkBU::eVertexBuffer
         };
-        vertexBuffer.create(size, usage);
-        vertexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
+        vertexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
         vertexBuffer.copy(vertices.data());
     }
 
@@ -600,15 +594,13 @@ private:
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
             vkBU::eIndexBuffer };
-        indexBuffer.create(size, usage);
-        indexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
+        indexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
         indexBuffer.copy(indices.data());
     }
 
     void createUniformBuffers()
     {
-        uniformBuffer.create(sizeof(UniformBufferObject), vk::BufferUsageFlagBits::eUniformBuffer);
-        uniformBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
+        uniformBuffer = Buffer{ sizeof(UniformBufferObject), vk::BufferUsageFlagBits::eUniformBuffer, vkMP::eHostVisible | vkMP::eHostCoherent };
     }
 
     void updateUniformBuffer()
@@ -665,11 +657,10 @@ private:
         asInstance.setAccelerationStructureReference(bottomLevelAS.buffer.deviceAddress);
         asInstance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
 
-        Buffer instancesBuffer;
-        instancesBuffer.create(sizeof(vk::AccelerationStructureInstanceKHR),
+        Buffer instancesBuffer{ sizeof(vk::AccelerationStructureInstanceKHR),
                                vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
-                               vkBU::eShaderDeviceAddress);
-        instancesBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
+                               vkBU::eShaderDeviceAddress,
+                               vkMP::eHostVisible | vkMP::eHostCoherent };
         instancesBuffer.copy(&asInstance);
 
         vk::AccelerationStructureGeometryInstancesDataKHR instancesData;

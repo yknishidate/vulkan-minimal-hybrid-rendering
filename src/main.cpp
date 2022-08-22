@@ -194,8 +194,7 @@ struct Mesh
             vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
-            vkBU::eVertexBuffer
-        };
+            vkBU::eVertexBuffer };
         vertexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
         vertexBuffer.copy(vertices.data());
     }
@@ -249,12 +248,11 @@ struct Scene
 
     void build()
     {
-        // Build bottom level as
         for (auto& mesh : meshes) {
             mesh.createVertexBuffer();
             mesh.createIndexBuffer();
+            mesh.createBottomLevelAS();
         }
-
         createTopLevelAS();
     }
 
@@ -283,7 +281,7 @@ struct Scene
             instances.push_back(instance);
         }
 
-        Buffer instancesBuffer{ sizeof(vk::AccelerationStructureInstanceKHR),
+        Buffer instancesBuffer{ sizeof(vk::AccelerationStructureInstanceKHR) * instances.size(),
                                vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
                                vkBU::eShaderDeviceAddress,
                                vkMP::eHostVisible | vkMP::eHostCoherent };
@@ -350,14 +348,8 @@ public:
     {
         createDescriptorSetLayout();
         createGraphicsPipeline();
-        //createVertexBuffer();
-        //createIndexBuffer();
         createUniformBuffers();
-        //createBottomLevelAS();
-        //createTopLevelAS();
-
         scene.build();
-
         createDescriptorSets();
         createCommandBuffers();
     }

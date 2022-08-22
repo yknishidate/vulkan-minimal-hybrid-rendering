@@ -16,7 +16,7 @@ struct Context
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-        VkDebugUtilsMessengerCallbackDataEXT const *pCallbackData, void *pUserData)
+        VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* pUserData)
     {
         std::cerr << pCallbackData->pMessage << "\n\n";
         return VK_FALSE;
@@ -29,7 +29,7 @@ struct Context
             std::vector extensions = Window::getRequiredInstanceExtensions();
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-            std::vector layers{"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor"};
+            std::vector layers{ "VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor" };
 
             static vk::DynamicLoader dl;
             auto vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
@@ -38,7 +38,7 @@ struct Context
             vk::ApplicationInfo appInfo;
             appInfo.setApiVersion(VK_API_VERSION_1_2);
 
-            instance = vk::createInstance({{}, &appInfo, layers, extensions});
+            instance = vk::createInstance({ {}, &appInfo, layers, extensions });
             VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
             physicalDevice = instance.enumeratePhysicalDevices().front();
         }
@@ -72,7 +72,7 @@ struct Context
         // Create device
         {
             float queuePriority = 1.0f;
-            vk::DeviceQueueCreateInfo queueCreateInfo{{}, queueFamily, 1, &queuePriority};
+            vk::DeviceQueueCreateInfo queueCreateInfo{ {}, queueFamily, 1, &queuePriority };
 
             const std::vector deviceExtensions{
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -84,7 +84,7 @@ struct Context
             };
 
             vk::PhysicalDeviceFeatures deviceFeatures;
-            vk::DeviceCreateInfo createInfo{{}, queueCreateInfo, {}, deviceExtensions, &deviceFeatures};
+            vk::DeviceCreateInfo createInfo{ {}, queueCreateInfo, {}, deviceExtensions, &deviceFeatures };
             vk::StructureChain createInfoChain{ createInfo,
                 vk::PhysicalDeviceBufferDeviceAddressFeatures{true},
                 vk::PhysicalDeviceAccelerationStructureFeaturesKHR{true},
@@ -130,6 +130,11 @@ struct Context
         throw std::runtime_error("failed to find suitable memory type");
     }
 
+    static vk::UniqueDescriptorSet allocateDescSet(vk::DescriptorSetLayout descSetLayout)
+    {
+        return std::move(device.allocateDescriptorSetsUnique({ descriptorPool, descSetLayout }).front());
+    }
+
     static std::vector<vk::UniqueCommandBuffer> allocateCommandBuffers(size_t count)
     {
         vk::CommandBufferAllocateInfo allocInfo;
@@ -138,10 +143,10 @@ struct Context
         return device.allocateCommandBuffersUnique(allocInfo);
     }
 
-    static void oneTimeSubmit(const std::function<void(vk::CommandBuffer)> &func)
+    static void oneTimeSubmit(const std::function<void(vk::CommandBuffer)>& func)
     {
         vk::UniqueCommandBuffer cmdBuf = std::move(allocateCommandBuffers(1).front());
-        cmdBuf->begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        cmdBuf->begin({ vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
         func(*cmdBuf);
         cmdBuf->end();
 
@@ -149,11 +154,6 @@ struct Context
         submitInfo.setCommandBuffers(*cmdBuf);
         queue.submit(submitInfo);
         queue.waitIdle();
-    }
-
-    static vk::UniqueDescriptorSet allocateDescSet(vk::DescriptorSetLayout descSetLayout)
-    {
-        return std::move(device.allocateDescriptorSetsUnique({ descriptorPool, descSetLayout }).front());
     }
 
     static void terminate()

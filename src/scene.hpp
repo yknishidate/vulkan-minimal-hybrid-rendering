@@ -124,11 +124,9 @@ struct Mesh
 
 struct Scene
 {
-    std::vector<Mesh> meshes;
-    AccelerationStructure topLevelAS;
-
-    void build()
+    Scene(const std::string& filepath)
     {
+        load(filepath);
         for (auto& mesh : meshes) {
             mesh.createVertexBuffer();
             mesh.createIndexBuffer();
@@ -144,6 +142,10 @@ struct Scene
         }
     }
 
+    std::vector<Mesh> meshes;
+    AccelerationStructure topLevelAS;
+
+private:
     void createTopLevelAS()
     {
         vk::TransformMatrixKHR transformMatrix = std::array{

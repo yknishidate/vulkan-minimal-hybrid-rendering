@@ -35,15 +35,11 @@ int main()
             Swapchain swapchain;
 
             GraphicsPipeline pipeline{
-                "../shaders/spv/shader.vert.spv",
-                "../shaders/spv/shader.frag.spv",
-                swapchain.extent,
-                *swapchain.renderPass
+                "../shaders/spv/shader.vert.spv", "../shaders/spv/shader.frag.spv",
+                swapchain.extent, *swapchain.renderPass
             };
 
-            Scene scene;
-            scene.load("../assets/bunny_and_teapot.obj");
-            scene.build();
+            Scene scene{ "../assets/bunny_and_teapot.obj" };
 
             Buffer uniformBuffer{
                 sizeof(UniformBufferObject),
@@ -57,21 +53,10 @@ int main()
             };
             pipeline.updateDescriptorSets(descriptorWrites);
 
-            vk::CommandBufferAllocateInfo allocInfo;
-            allocInfo.setCommandPool(Context::commandPool);
-            allocInfo.setCommandBufferCount(static_cast<uint32_t>(swapchain.framebuffers.size()));
-
-            std::vector commandBuffers = Context::device.allocateCommandBuffersUnique(allocInfo);
-            for (size_t i = 0; i < commandBuffers.size(); i++) {
-                commandBuffers[i]->begin(vk::CommandBufferBeginInfo{});
-                swapchain.beginRenderPass(*commandBuffers[i], i);
-                pipeline.bind(*commandBuffers[i]);
-                scene.draw(*commandBuffers[i]);
-                swapchain.endRenderPass(*commandBuffers[i]);
-                commandBuffers[i]->end();
-            }
+            std::vector commandBuffers = Context::allocateCommandBuffers(swapchain.imageCount);
 
             UniformBufferObject ubo;
+
             while (!Window::shouldClose()) {
                 Window::pollEvents();
                 uint32_t imageIndex = swapchain.acquireNextImage();
@@ -79,7 +64,15 @@ int main()
                 ubo.update();
                 uniformBuffer.copy(&ubo);
 
-                swapchain.submit(*commandBuffers[imageIndex]);
+                vk::CommandBuffer commandBuffer = *commandBuffers[imageIndex];
+                commandBuffer.begin(vk::CommandBufferBeginInfo{});
+                swapchain.beginRenderPass(commandBuffer, imageIndex);
+                pipeline.bind(commandBuffer);
+                scene.draw(commandBuffer);
+                swapchain.endRenderPass(commandBuffer);
+                commandBuffer.end();
+
+                swapchain.submit(commandBuffer);
                 swapchain.present(imageIndex);
             }
             Context::device.waitIdle();

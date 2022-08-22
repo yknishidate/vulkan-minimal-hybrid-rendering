@@ -127,7 +127,10 @@ struct Image
     vk::Extent2D extent;
     vk::Format format;
 
-    void create(vk::Extent2D extent, vk::Format format, vk::ImageUsageFlags usage)
+    Image() = default;
+
+    Image(vk::Extent2D extent, vk::Format format, vk::ImageUsageFlags usage,
+          vk::ImageAspectFlags aspect)
     {
         this->extent = extent;
         this->format = format;
@@ -141,25 +144,19 @@ struct Image
         createInfo.setTiling(vk::ImageTiling::eOptimal);
         createInfo.setUsage(usage);
         image = Context::device.createImageUnique(createInfo);
-    }
 
-    void allocate()
-    {
         vk::MemoryRequirements requirements = Context::device.getImageMemoryRequirements(*image);
         uint32_t memoryTypeIndex = Context::findMemoryType(requirements.memoryTypeBits,
                                                            vk::MemoryPropertyFlagBits::eDeviceLocal);
         memory = Context::device.allocateMemoryUnique({ requirements.size, memoryTypeIndex });
         Context::device.bindImageMemory(*image, *memory, 0);
-    }
 
-    void createView(vk::ImageAspectFlags aspect)
-    {
-        vk::ImageViewCreateInfo createInfo;
-        createInfo.setImage(*image);
-        createInfo.setViewType(vk::ImageViewType::e2D);
-        createInfo.setFormat(format);
-        createInfo.setSubresourceRange({ aspect, 0, 1, 0, 1 });
-        view = Context::device.createImageViewUnique(createInfo);
+        vk::ImageViewCreateInfo viewInfo;
+        viewInfo.setImage(*image);
+        viewInfo.setViewType(vk::ImageViewType::e2D);
+        viewInfo.setFormat(format);
+        viewInfo.setSubresourceRange({ aspect, 0, 1, 0, 1 });
+        view = Context::device.createImageViewUnique(viewInfo);
     }
 };
 
@@ -548,9 +545,8 @@ private:
     void createDepthResources()
     {
         vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        depthImage.create({ static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
-        depthImage.allocate();
-        depthImage.createView(vk::ImageAspectFlagBits::eDepth);
+        depthImage = Image{ { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage,
+                            vk::ImageAspectFlagBits::eDepth };
 
         Context::oneTimeSubmit([&](vk::CommandBuffer commandBuffer) {
             vk::ImageMemoryBarrier barrier;

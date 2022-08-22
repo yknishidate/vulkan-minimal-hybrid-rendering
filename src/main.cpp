@@ -103,70 +103,6 @@ struct Buffer
     }
 };
 
-std::vector<std::string> split(std::string& str, char separator)
-{
-    std::vector<std::string> list;
-    size_t offset = 0;
-    while (1) {
-        auto pos = str.find(separator, offset);
-        if (pos == std::string::npos) {
-            list.push_back(str.substr(offset));
-            break;
-        }
-        list.push_back(str.substr(offset, pos - offset));
-        offset = pos + 1;
-    }
-    return list;
-}
-
-struct Mesh
-{
-    std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
-
-    void load(const std::string& filepath)
-    {
-        std::ifstream file(filepath);
-        std::string line;
-        std::vector<glm::vec3> positions;
-        std::vector<glm::vec3> normals;
-        std::vector<std::pair<int, int>> verts;
-
-        uint16_t currentMeshIndex = -1;
-        while (std::getline(file, line)) {
-            std::vector<std::string> list = split(line, ' ');
-            if (list[0] == "v") {
-                positions.push_back(glm::vec3(stof(list[1]), -stof(list[2]), stof(list[3])));
-            }
-            if (list[0] == "vn") {
-                normals.push_back(glm::vec3(stof(list[1]), -stof(list[2]), stof(list[3])));
-            }
-            if (list[0] == "o") {
-                currentMeshIndex++;
-            }
-            if (list[0] == "f") {
-                for (int i = 1; i <= 3; i++) {
-                    std::vector<std::string> vertAttrs = split(list[i], '/');
-                    int posIndex = stoi(vertAttrs[0]) - 1;
-                    int normalIndex = stoi(vertAttrs[2]) - 1;
-                    std::pair vert{ posIndex, normalIndex };
-                    auto itr = std::find(verts.begin(), verts.end(), vert);
-
-                    if (itr == verts.end()) {
-                        verts.push_back(vert);
-                        Vertex v{ positions[posIndex], normals[normalIndex], currentMeshIndex };
-                        vertices.push_back(v);
-                        indices.push_back(vertices.size() - 1);
-                    } else {
-                        int index = std::distance(verts.begin(), itr);
-                        indices.push_back(index);
-                    }
-                }
-            }
-        }
-    }
-};
-
 struct AccelerationStructure
 {
     vk::UniqueAccelerationStructureKHR accel;
@@ -227,6 +163,179 @@ struct AccelerationStructure
     }
 };
 
+std::vector<std::string> split(std::string& str, char separator)
+{
+    std::vector<std::string> list;
+    size_t offset = 0;
+    while (1) {
+        auto pos = str.find(separator, offset);
+        if (pos == std::string::npos) {
+            list.push_back(str.substr(offset));
+            break;
+        }
+        list.push_back(str.substr(offset, pos - offset));
+        offset = pos + 1;
+    }
+    return list;
+}
+
+struct Mesh
+{
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
+    Buffer vertexBuffer;
+    Buffer indexBuffer;
+    AccelerationStructure bottomLevelAS;
+
+    void createVertexBuffer()
+    {
+        vk::DeviceSize size = sizeof(Vertex) * vertices.size();
+        vk::BufferUsageFlags usage{
+            vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
+            vkBU::eStorageBuffer |
+            vkBU::eShaderDeviceAddress |
+            vkBU::eVertexBuffer
+        };
+        vertexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
+        vertexBuffer.copy(vertices.data());
+    }
+
+    void createIndexBuffer()
+    {
+        vk::DeviceSize size = sizeof(uint16_t) * indices.size();
+        vk::BufferUsageFlags usage{
+            vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
+            vkBU::eStorageBuffer |
+            vkBU::eShaderDeviceAddress |
+            vkBU::eIndexBuffer };
+        indexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
+        indexBuffer.copy(indices.data());
+    }
+
+    void createBottomLevelAS()
+    {
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangleData;
+        triangleData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
+        triangleData.setVertexData(vertexBuffer.deviceAddress);
+        triangleData.setVertexStride(sizeof(Vertex));
+        triangleData.setMaxVertex(vertices.size());
+        triangleData.setIndexType(vk::IndexType::eUint16);
+        triangleData.setIndexData(indexBuffer.deviceAddress);
+
+        vk::AccelerationStructureGeometryKHR geometry;
+        geometry.setGeometryType(vk::GeometryTypeKHR::eTriangles);
+        geometry.setGeometry({ triangleData });
+        geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+
+        uint32_t primitiveCount = indices.size() / 3;
+        bottomLevelAS = AccelerationStructure{ geometry,
+                                               vk::AccelerationStructureTypeKHR::eBottomLevel,
+                                               primitiveCount };
+    }
+
+    void draw(vk::CommandBuffer commandBuffer)
+    {
+        vk::DeviceSize offsets{ 0 };
+        commandBuffer.bindVertexBuffers(0, *vertexBuffer.buffer, offsets);
+        commandBuffer.bindIndexBuffer(*indexBuffer.buffer, 0, vk::IndexType::eUint16);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+    }
+};
+
+struct Scene
+{
+    std::vector<Mesh> meshes;
+    AccelerationStructure topLevelAS;
+
+    void build()
+    {
+        // Build bottom level as
+        for (auto& mesh : meshes) {
+            mesh.createVertexBuffer();
+            mesh.createIndexBuffer();
+        }
+
+        createTopLevelAS();
+    }
+
+    void draw(vk::CommandBuffer commandBuffer)
+    {
+        for (auto& mesh : meshes) {
+            mesh.draw(commandBuffer);
+        }
+    }
+
+    void createTopLevelAS()
+    {
+        vk::TransformMatrixKHR transformMatrix = std::array{
+            std::array{1.0f, 0.0f, 0.0f, 0.0f},
+            std::array{0.0f, 1.0f, 0.0f, 0.0f},
+            std::array{0.0f, 0.0f, 1.0f, 0.0f}
+        };
+
+        std::vector<vk::AccelerationStructureInstanceKHR> instances;
+        for (auto& mesh : meshes) {
+            vk::AccelerationStructureInstanceKHR instance;
+            instance.setTransform(transformMatrix);
+            instance.setMask(0xFF);
+            instance.setAccelerationStructureReference(mesh.bottomLevelAS.buffer.deviceAddress);
+            instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
+            instances.push_back(instance);
+        }
+
+        Buffer instancesBuffer{ sizeof(vk::AccelerationStructureInstanceKHR),
+                               vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
+                               vkBU::eShaderDeviceAddress,
+                               vkMP::eHostVisible | vkMP::eHostCoherent };
+        instancesBuffer.copy(instances.data());
+
+        vk::AccelerationStructureGeometryInstancesDataKHR instancesData;
+        instancesData.setArrayOfPointers(false);
+        instancesData.setData(instancesBuffer.deviceAddress);
+
+        vk::AccelerationStructureGeometryKHR geometry;
+        geometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
+        geometry.setGeometry({ instancesData });
+        geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+
+        topLevelAS = AccelerationStructure{ geometry,
+                                            vk::AccelerationStructureTypeKHR::eTopLevel,
+                                            static_cast<uint32_t>(instances.size()) };
+    }
+
+    void load(const std::string& filepath)
+    {
+        std::ifstream file(filepath);
+        std::string line;
+        std::vector<glm::vec3> positions;
+        std::vector<glm::vec3> normals;
+
+        while (std::getline(file, line)) {
+            std::vector<std::string> list = split(line, ' ');
+            if (list[0] == "v") {
+                positions.push_back(glm::vec3(stof(list[1]), -stof(list[2]), stof(list[3])));
+            }
+            if (list[0] == "vn") {
+                normals.push_back(glm::vec3(stof(list[1]), -stof(list[2]), stof(list[3])));
+            }
+            if (list[0] == "o") {
+                meshes.push_back({});
+            }
+            if (list[0] == "f") {
+                for (int i = 1; i <= 3; i++) {
+                    std::vector<std::string> vertAttrs = split(list[i], '/');
+                    int posIndex = stoi(vertAttrs[0]) - 1;
+                    int normalIndex = stoi(vertAttrs[2]) - 1;
+
+                    Vertex v{ positions[posIndex], normals[normalIndex], static_cast<uint16_t>(meshes.size() - 1) };
+                    meshes.back().vertices.push_back(v);
+                    meshes.back().indices.push_back(meshes.back().vertices.size() - 1);
+                }
+            }
+        }
+    }
+};
+
 struct UniformBufferObject
 {
     glm::mat4 model;
@@ -241,11 +350,14 @@ public:
     {
         createDescriptorSetLayout();
         createGraphicsPipeline();
-        createVertexBuffer();
-        createIndexBuffer();
+        //createVertexBuffer();
+        //createIndexBuffer();
         createUniformBuffers();
-        createBottomLevelAS();
-        createTopLevelAS();
+        //createBottomLevelAS();
+        //createTopLevelAS();
+
+        scene.build();
+
         createDescriptorSets();
         createCommandBuffers();
     }
@@ -270,10 +382,9 @@ public:
         fragShaderPath = path;
     }
 
-    void setMesh(const Mesh& mesh)
+    void load(const std::string& filepath)
     {
-        this->vertices = mesh.vertices;
-        this->indices = mesh.indices;
+        scene.load(filepath);
     }
 
 private:
@@ -282,18 +393,13 @@ private:
     vk::UniqueDescriptorSetLayout descriptorSetLayout;
     vk::UniqueDescriptorSet descriptorSet;
 
-    std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
+    Scene scene;
     std::string vertShaderPath;
     std::string fragShaderPath;
     vk::UniquePipelineLayout pipelineLayout;
     vk::UniquePipeline graphicsPipeline;
 
-    Buffer vertexBuffer;
-    Buffer indexBuffer;
     Buffer uniformBuffer;
-    AccelerationStructure bottomLevelAS;
-    AccelerationStructure topLevelAS;
 
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
 
@@ -404,31 +510,6 @@ private:
         graphicsPipeline = std::move(result.value);
     }
 
-    void createVertexBuffer()
-    {
-        vk::DeviceSize size = sizeof(Vertex) * vertices.size();
-        vk::BufferUsageFlags usage{
-            vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
-            vkBU::eStorageBuffer |
-            vkBU::eShaderDeviceAddress |
-            vkBU::eVertexBuffer
-        };
-        vertexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
-        vertexBuffer.copy(vertices.data());
-    }
-
-    void createIndexBuffer()
-    {
-        vk::DeviceSize size = sizeof(uint16_t) * indices.size();
-        vk::BufferUsageFlags usage{
-            vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
-            vkBU::eStorageBuffer |
-            vkBU::eShaderDeviceAddress |
-            vkBU::eIndexBuffer };
-        indexBuffer = Buffer{ size, usage, vkMP::eHostVisible | vkMP::eHostCoherent };
-        indexBuffer.copy(indices.data());
-    }
-
     void createUniformBuffers()
     {
         uniformBuffer = Buffer{ sizeof(UniformBufferObject), vk::BufferUsageFlagBits::eUniformBuffer, vkMP::eHostVisible | vkMP::eHostCoherent };
@@ -453,69 +534,13 @@ private:
         frame++;
     }
 
-    void createBottomLevelAS()
-    {
-        vk::AccelerationStructureGeometryTrianglesDataKHR triangleData;
-        triangleData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
-        triangleData.setVertexData(vertexBuffer.deviceAddress);
-        triangleData.setVertexStride(sizeof(Vertex));
-        triangleData.setMaxVertex(vertices.size());
-        triangleData.setIndexType(vk::IndexType::eUint16);
-        triangleData.setIndexData(indexBuffer.deviceAddress);
-
-        vk::AccelerationStructureGeometryKHR geometry;
-        geometry.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-        geometry.setGeometry({ triangleData });
-        geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
-
-        uint32_t primitiveCount = indices.size() / 3;
-        bottomLevelAS = AccelerationStructure{ geometry,
-                                               vk::AccelerationStructureTypeKHR::eBottomLevel,
-                                               primitiveCount };
-    }
-
-    void createTopLevelAS()
-    {
-        vk::TransformMatrixKHR transformMatrix = std::array{
-            std::array{1.0f, 0.0f, 0.0f, 0.0f},
-            std::array{0.0f, 1.0f, 0.0f, 0.0f},
-            std::array{0.0f, 0.0f, 1.0f, 0.0f}
-        };
-
-        vk::AccelerationStructureInstanceKHR asInstance;
-        asInstance.setTransform(transformMatrix);
-        asInstance.setMask(0xFF);
-        asInstance.setAccelerationStructureReference(bottomLevelAS.buffer.deviceAddress);
-        asInstance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
-
-        Buffer instancesBuffer{ sizeof(vk::AccelerationStructureInstanceKHR),
-                               vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
-                               vkBU::eShaderDeviceAddress,
-                               vkMP::eHostVisible | vkMP::eHostCoherent };
-        instancesBuffer.copy(&asInstance);
-
-        vk::AccelerationStructureGeometryInstancesDataKHR instancesData;
-        instancesData.setArrayOfPointers(false);
-        instancesData.setData(instancesBuffer.deviceAddress);
-
-        vk::AccelerationStructureGeometryKHR geometry;
-        geometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
-        geometry.setGeometry({ instancesData });
-        geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
-
-        uint32_t primitiveCount = 1;
-        topLevelAS = AccelerationStructure{ geometry,
-                                            vk::AccelerationStructureTypeKHR::eTopLevel,
-                                            primitiveCount };
-    }
-
     void createDescriptorSets()
     {
         descriptorSet = Context::allocateDescSet(*descriptorSetLayout);
 
         std::vector descriptorWrites{
             uniformBuffer.createDescWrite(*descriptorSet, vkDT::eUniformBuffer, 0),
-            topLevelAS.createDescWrite(*descriptorSet, 1)
+            scene.topLevelAS.createDescWrite(*descriptorSet, 1)
         };
         Context::device.updateDescriptorSets(descriptorWrites, nullptr);
     }
@@ -541,12 +566,13 @@ private:
             commandBuffers[i]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
-            vk::DeviceSize offsets{ 0 };
-            commandBuffers[i]->bindVertexBuffers(0, *vertexBuffer.buffer, offsets);
-            commandBuffers[i]->bindIndexBuffer(*indexBuffer.buffer, 0, vk::IndexType::eUint16);
+            //vk::DeviceSize offsets{ 0 };
+            //commandBuffers[i]->bindVertexBuffers(0, *vertexBuffer.buffer, offsets);
+            //commandBuffers[i]->bindIndexBuffer(*indexBuffer.buffer, 0, vk::IndexType::eUint16);
             commandBuffers[i]->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                                   *pipelineLayout, 0, *descriptorSet, nullptr);
-            commandBuffers[i]->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            scene.draw(*commandBuffers[i]);
+            //commandBuffers[i]->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
             commandBuffers[i]->endRenderPass();
             commandBuffers[i]->end();
@@ -583,13 +609,15 @@ int main()
         Context::init();
 
         {
-            Mesh mesh;
-            mesh.load("../assets/bunny_and_teapot.obj");
+            //Scene scene;
+            //scene.load("../assets/bunny_and_teapot.obj");
+            //Mesh mesh;
+            //mesh.load("../assets/bunny_and_teapot.obj");
 
             Application app;
+            app.load("../assets/bunny_and_teapot.obj");
             app.setVertShaderPath("../shaders/spv/shader.vert.spv");
             app.setFragShaderPath("../shaders/spv/shader.frag.spv");
-            app.setMesh(mesh);
             app.initVulkan();
             app.mainLoop();
         }

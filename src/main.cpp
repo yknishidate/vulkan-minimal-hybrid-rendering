@@ -23,39 +23,7 @@ using vkBU = vk::BufferUsageFlagBits;
 using vkMP = vk::MemoryPropertyFlagBits;
 using vkDT = vk::DescriptorType;
 
-const bool enableValidationLayers = true;
 const int MAX_FRAMES_IN_FLIGHT = 2;
-
-const std::vector<const char*> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"
-};
-
-const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-    VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-    VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
-    VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-    VK_KHR_RAY_QUERY_EXTENSION_NAME,
-};
-
-struct QueueFamilyIndices
-{
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-
-    bool isComplete()
-    {
-        return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-};
-
-struct SwapChainSupportDetails
-{
-    vk::SurfaceCapabilitiesKHR capabilities;
-    std::vector<vk::SurfaceFormatKHR> formats;
-    std::vector<vk::PresentModeKHR> presentModes;
-};
 
 struct Vertex
 {
@@ -904,7 +872,7 @@ private:
         if (!file.is_open()) {
             throw std::runtime_error("failed to open file!");
         }
-        size_t fileSize = (size_t)file.tellg();
+        size_t fileSize = file.tellg();
         std::vector<char> buffer(fileSize);
         file.seekg(0);
         file.read(buffer.data(), fileSize);
@@ -915,15 +883,15 @@ private:
 
 int main()
 {
-    Mesh mesh;
-    mesh.load("../assets/bunny_and_teapot.obj");
-
-    Application app;
-    app.setVertShaderPath("../shaders/spv/shader.vert.spv");
-    app.setFragShaderPath("../shaders/spv/shader.frag.spv");
-    app.setMesh(mesh);
-
     try {
+        Mesh mesh;
+        mesh.load("../assets/bunny_and_teapot.obj");
+
+        Application app;
+        app.setVertShaderPath("../shaders/spv/shader.vert.spv");
+        app.setFragShaderPath("../shaders/spv/shader.frag.spv");
+        app.setMesh(mesh);
+
         Window::init(1000, 800);
         Context::init();
         app.initVulkan();
@@ -932,6 +900,6 @@ int main()
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
     }
-
+    Context::terminate();
     return EXIT_SUCCESS;
 }

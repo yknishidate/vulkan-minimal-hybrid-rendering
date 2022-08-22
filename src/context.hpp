@@ -1,5 +1,4 @@
 #include <string>
-#include <fstream>
 #include <iostream>
 #include <functional>
 
@@ -195,6 +194,20 @@ struct Context
             throw std::runtime_error("failed to acquire next image!");
         }
         return res.value;
+    }
+
+    static void terminate()
+    {
+        descPool.reset();
+        for(auto& view: swapchainImageViews) {
+            view.reset();
+        }
+        swapchain.reset();
+        commandPool.reset();
+        device.reset();
+        surface.reset();
+        messenger.reset();
+        instance.reset();
     }
 
     static inline vk::UniqueInstance instance;

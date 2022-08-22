@@ -50,12 +50,10 @@ struct Buffer
         memcpy(mapped, data, size);
     }
 
-    vk::WriteDescriptorSet createDescWrite(const vk::DescriptorSet& descSet,
-                                           vk::DescriptorType type, uint32_t binding)
+    vk::WriteDescriptorSet createDescWrite(vk::DescriptorType type, uint32_t binding)
     {
         bufferInfo = vk::DescriptorBufferInfo{ *buffer, 0, size };
         vk::WriteDescriptorSet bufferWrite;
-        bufferWrite.setDstSet(descSet);
         bufferWrite.setDescriptorType(type);
         bufferWrite.setDescriptorCount(1);
         bufferWrite.setDstBinding(binding);

@@ -40,11 +40,10 @@ struct AccelerationStructure
             });
     }
 
-    vk::WriteDescriptorSet createDescWrite(vk::DescriptorSet descSet, uint32_t binding)
+    vk::WriteDescriptorSet createDescWrite(uint32_t binding)
     {
         asInfo = vk::WriteDescriptorSetAccelerationStructureKHR{ *accel };
         vk::WriteDescriptorSet asWrite;
-        asWrite.setDstSet(descSet);
         asWrite.setDescriptorType(vkDT::eAccelerationStructureKHR);
         asWrite.setDescriptorCount(1);
         asWrite.setDstBinding(binding);

@@ -1,6 +1,5 @@
 
-#include "scene.hpp"
-#include "swapchain.hpp"
+#include "pipeline.hpp"
 
 struct UniformBufferObject
 {
@@ -14,11 +13,23 @@ class Application
 public:
     void initVulkan()
     {
-        createDescriptorSetLayout();
-        createGraphicsPipeline();
+        graphicsPipeline = GraphicsPipeline{
+            "../shaders/spv/shader.vert.spv",
+            "../shaders/spv/shader.frag.spv",
+            swapchain.extent,
+            *swapchain.renderPass
+        };
+
         createUniformBuffers();
         scene.build();
-        createDescriptorSets();
+
+        std::vector descriptorWrites{
+            uniformBuffer.createDescWrite(vkDT::eUniformBuffer, 0),
+            scene.topLevelAS.createDescWrite(1)
+        };
+
+        graphicsPipeline.updateDescriptorSets(descriptorWrites);
+
         createCommandBuffers();
     }
 
@@ -49,15 +60,11 @@ public:
 
 private:
     Swapchain swapchain;
-
-    vk::UniqueDescriptorSetLayout descriptorSetLayout;
-    vk::UniqueDescriptorSet descriptorSet;
+    GraphicsPipeline graphicsPipeline;
 
     Scene scene;
     std::string vertShaderPath;
     std::string fragShaderPath;
-    vk::UniquePipelineLayout pipelineLayout;
-    vk::UniquePipeline graphicsPipeline;
 
     Buffer uniformBuffer;
 
@@ -66,108 +73,6 @@ private:
     void cleanup()
     {
         Window::terminate();
-    }
-
-    vk::UniqueShaderModule createShaderModule(const std::string& shaderPath)
-    {
-        auto code = readFile(shaderPath);
-        vk::ShaderModuleCreateInfo createInfo;
-        createInfo.setCodeSize(code.size());
-        createInfo.setPCode(reinterpret_cast<const uint32_t*>(code.data()));
-        return Context::device.createShaderModuleUnique(createInfo);
-    }
-
-    void createDescriptorSetLayout()
-    {
-        using vkSS = vk::ShaderStageFlagBits;
-        std::vector<vk::DescriptorSetLayoutBinding> bindings;
-        bindings.emplace_back(0, vkDT::eUniformBuffer, 1, vkSS::eVertex);
-        bindings.emplace_back(1, vkDT::eAccelerationStructureKHR, 1, vkSS::eFragment);
-
-        vk::DescriptorSetLayoutCreateInfo layoutInfo;
-        layoutInfo.setBindings(bindings);
-        descriptorSetLayout = Context::device.createDescriptorSetLayoutUnique(layoutInfo);
-    }
-
-    void createGraphicsPipeline()
-    {
-        vk::UniqueShaderModule vertShaderModule = createShaderModule(vertShaderPath);
-        vk::UniqueShaderModule fragShaderModule = createShaderModule(fragShaderPath);
-        vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
-        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);
-        vertShaderStageInfo.setModule(*vertShaderModule);
-        vertShaderStageInfo.setPName("main");
-        vk::PipelineShaderStageCreateInfo fragShaderStageInfo;
-        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);
-        fragShaderStageInfo.setModule(*fragShaderModule);
-        fragShaderStageInfo.setPName("main");
-        std::array shaderStages{ vertShaderStageInfo, fragShaderStageInfo };
-
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
-        vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
-        vertexInputInfo.setVertexBindingDescriptions(bindingDescription);
-        vertexInputInfo.setVertexAttributeDescriptions(attributeDescriptions);
-
-        vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
-        inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
-
-        float width = static_cast<float>(Window::width);
-        float height = static_cast<float>(Window::height);
-        vk::Viewport viewport{ 0.0f, 0.0f, width, height, 0.0f, 1.0f };
-        vk::Rect2D scissor{ { 0, 0 }, swapchain.extent };
-        vk::PipelineViewportStateCreateInfo viewportState{ {}, 1, &viewport, 1, &scissor };
-
-        vk::PipelineRasterizationStateCreateInfo rasterizer;
-        rasterizer.setDepthClampEnable(VK_FALSE);
-        rasterizer.setRasterizerDiscardEnable(VK_FALSE);
-        rasterizer.setPolygonMode(vk::PolygonMode::eFill);
-        rasterizer.setCullMode(vk::CullModeFlagBits::eNone);
-        rasterizer.setFrontFace(vk::FrontFace::eCounterClockwise);
-        rasterizer.setDepthBiasEnable(VK_FALSE);
-        rasterizer.setLineWidth(1.0f);
-
-        vk::PipelineMultisampleStateCreateInfo multisampling;
-        multisampling.setSampleShadingEnable(VK_FALSE);
-
-        vk::PipelineDepthStencilStateCreateInfo depthStencil;
-        depthStencil.setDepthTestEnable(VK_TRUE);
-        depthStencil.setDepthWriteEnable(VK_TRUE);
-        depthStencil.setDepthCompareOp(vk::CompareOp::eLess);
-        depthStencil.setDepthBoundsTestEnable(VK_FALSE);
-        depthStencil.setStencilTestEnable(VK_FALSE);
-
-        using vkCC = vk::ColorComponentFlagBits;
-        vk::PipelineColorBlendAttachmentState colorBlendAttachment;
-        colorBlendAttachment.setBlendEnable(VK_FALSE);
-        colorBlendAttachment.setColorWriteMask(vkCC::eR | vkCC::eG | vkCC::eB | vkCC::eA);
-
-        vk::PipelineColorBlendStateCreateInfo colorBlending;
-        colorBlending.setLogicOpEnable(VK_FALSE);
-        colorBlending.setAttachments(colorBlendAttachment);
-
-        vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
-        pipelineLayoutInfo.setSetLayouts(*descriptorSetLayout);
-        pipelineLayout = Context::device.createPipelineLayoutUnique(pipelineLayoutInfo);
-
-        vk::GraphicsPipelineCreateInfo pipelineInfo;
-        pipelineInfo.setStages(shaderStages);
-        pipelineInfo.setPVertexInputState(&vertexInputInfo);
-        pipelineInfo.setPInputAssemblyState(&inputAssembly);
-        pipelineInfo.setPViewportState(&viewportState);
-        pipelineInfo.setPRasterizationState(&rasterizer);
-        pipelineInfo.setPMultisampleState(&multisampling);
-        pipelineInfo.setPDepthStencilState(&depthStencil);
-        pipelineInfo.setPColorBlendState(&colorBlending);
-        pipelineInfo.setLayout(*pipelineLayout);
-        pipelineInfo.setRenderPass(*swapchain.renderPass);
-        pipelineInfo.setSubpass(0);
-
-        auto result = Context::device.createGraphicsPipelineUnique({}, pipelineInfo);
-        if (result.result != vk::Result::eSuccess) {
-            throw std::runtime_error("failed to create a pipeline!");
-        }
-        graphicsPipeline = std::move(result.value);
     }
 
     void createUniformBuffers()
@@ -194,17 +99,6 @@ private:
         frame++;
     }
 
-    void createDescriptorSets()
-    {
-        descriptorSet = Context::allocateDescSet(*descriptorSetLayout);
-
-        std::vector descriptorWrites{
-            uniformBuffer.createDescWrite(*descriptorSet, vkDT::eUniformBuffer, 0),
-            scene.topLevelAS.createDescWrite(*descriptorSet, 1)
-        };
-        Context::device.updateDescriptorSets(descriptorWrites, nullptr);
-    }
-
     void createCommandBuffers()
     {
         vk::CommandBufferAllocateInfo allocInfo;
@@ -224,9 +118,8 @@ private:
             renderPassInfo.setFramebuffer(*swapchain.framebuffers[i]);
             commandBuffers[i]->begin(vk::CommandBufferBeginInfo{});
             commandBuffers[i]->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-            commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-            commandBuffers[i]->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                                  *pipelineLayout, 0, *descriptorSet, nullptr);
+
+            graphicsPipeline.bind(*commandBuffers[i]);
             scene.draw(*commandBuffers[i]);
             commandBuffers[i]->endRenderPass();
             commandBuffers[i]->end();
@@ -239,20 +132,6 @@ private:
         updateUniformBuffer();
         swapchain.submit(*commandBuffers[imageIndex]);
         swapchain.present(imageIndex);
-    }
-
-    static std::vector<char> readFile(const std::string& filename)
-    {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) {
-            throw std::runtime_error("failed to open file!");
-        }
-        size_t fileSize = file.tellg();
-        std::vector<char> buffer(fileSize);
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-        file.close();
-        return buffer;
     }
 };
 

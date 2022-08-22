@@ -36,9 +36,9 @@ struct Context
             vk::ApplicationInfo appInfo;
             appInfo.setApiVersion(VK_API_VERSION_1_2);
 
-            instance = vk::createInstanceUnique({{}, &appInfo, layers, extensions});
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
-            physicalDevice = instance->enumeratePhysicalDevices().front();
+            instance = vk::createInstance({{}, &appInfo, layers, extensions});
+            VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+            physicalDevice = instance.enumeratePhysicalDevices().front();
         }
 
         // Create debug messenger
@@ -47,13 +47,12 @@ struct Context
             messengerInfo.setMessageSeverity(vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
             messengerInfo.setMessageType(vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
             messengerInfo.setPfnUserCallback(&debugUtilsMessengerCallback);
-            messenger = instance->createDebugUtilsMessengerEXTUnique(messengerInfo);
+            messenger = instance.createDebugUtilsMessengerEXT(messengerInfo);
         }
 
         // Create surface
         {
-            VkSurfaceKHR _surface = Window::createSurface(*instance);
-            surface = vk::UniqueSurfaceKHR(vk::SurfaceKHR(_surface), {*instance});
+            surface = Window::createSurface(instance);
         }
 
         // Find queue family
@@ -61,7 +60,7 @@ struct Context
             auto queueFamilies = physicalDevice.getQueueFamilyProperties();
             for (int i = 0; i < queueFamilies.size(); i++) {
                 auto supportGraphics = queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics;
-                auto supportPresent = physicalDevice.getSurfaceSupportKHR(i, *surface);
+                auto supportPresent = physicalDevice.getSurfaceSupportKHR(i, surface);
                 if (supportGraphics && supportPresent) {
                     queueFamily = i;
                 }
@@ -89,16 +88,16 @@ struct Context
                 vk::PhysicalDeviceAccelerationStructureFeaturesKHR{true},
                 vk::PhysicalDeviceRayQueryFeaturesKHR{true} };
 
-            device = physicalDevice.createDeviceUnique(createInfoChain.get<vk::DeviceCreateInfo>());
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
+            device = physicalDevice.createDevice(createInfoChain.get<vk::DeviceCreateInfo>());
+            VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
 
-            queue = device->getQueue(queueFamily, 0);
+            queue = device.getQueue(queueFamily, 0);
         }
 
         // Create swapchain
         {
             vk::SwapchainCreateInfoKHR swapchainInfo{};
-            swapchainInfo.setSurface(*surface);
+            swapchainInfo.setSurface(surface);
             swapchainInfo.setMinImageCount(3);
             swapchainInfo.setImageFormat(vk::Format::eB8G8R8A8Unorm);
             swapchainInfo.setImageColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
@@ -108,12 +107,12 @@ struct Context
             swapchainInfo.setPreTransform(vk::SurfaceTransformFlagBitsKHR::eIdentity);
             swapchainInfo.setPresentMode(vk::PresentModeKHR::eFifo);
             swapchainInfo.setClipped(true);
-            swapchain = device->createSwapchainKHRUnique(swapchainInfo);
+            swapchain = device.createSwapchainKHR(swapchainInfo);
         }
 
         // Create swapchain image views
         {
-            swapchainImages = device->getSwapchainImagesKHR(*swapchain);
+            swapchainImages = device.getSwapchainImagesKHR(swapchain);
             swapchainImageViews.resize(swapchainImages.size());
 
             vk::ImageSubresourceRange subresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
@@ -123,7 +122,7 @@ struct Context
                 createInfo.setViewType(vk::ImageViewType::e2D);
                 createInfo.setFormat(vk::Format::eB8G8R8A8Unorm);
                 createInfo.setSubresourceRange(subresourceRange);
-                swapchainImageViews[i] = device->createImageViewUnique(createInfo);
+                swapchainImageViews[i] = device.createImageView(createInfo);
             }
         }
 
@@ -132,7 +131,7 @@ struct Context
             vk::CommandPoolCreateInfo poolInfo;
             poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
             poolInfo.setQueueFamilyIndex(queueFamily);
-            commandPool = device->createCommandPoolUnique(poolInfo);
+            commandPool = device.createCommandPool(poolInfo);
         }
 
         // Create descriptor pool
@@ -146,7 +145,7 @@ struct Context
             poolInfo.setPoolSizes(poolSizes);
             poolInfo.setMaxSets(3);
             poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-            descPool = device->createDescriptorPoolUnique(poolInfo);
+            descPool = device.createDescriptorPool(poolInfo);
         }
     }
 
@@ -164,9 +163,9 @@ struct Context
     static std::vector<vk::UniqueCommandBuffer> allocateCommandBuffers(size_t count)
     {
         vk::CommandBufferAllocateInfo allocInfo;
-        allocInfo.setCommandPool(*commandPool);
+        allocInfo.setCommandPool(commandPool);
         allocInfo.setCommandBufferCount(static_cast<uint32_t>(count));
-        return device->allocateCommandBuffersUnique(allocInfo);
+        return device.allocateCommandBuffersUnique(allocInfo);
     }
 
     static void oneTimeSubmit(const std::function<void(vk::CommandBuffer)> &func)
@@ -184,12 +183,12 @@ struct Context
 
     static vk::UniqueDescriptorSet allocateDescSet(vk::DescriptorSetLayout descSetLayout)
     {
-        return std::move(device->allocateDescriptorSetsUnique({*descPool, descSetLayout}).front());
+        return std::move(device.allocateDescriptorSetsUnique({descPool, descSetLayout}).front());
     }
 
     static uint32_t acquireNextImage(vk::Semaphore semaphore)
     {
-        auto res = device->acquireNextImageKHR(*swapchain, UINT64_MAX, semaphore);
+        auto res = device.acquireNextImageKHR(swapchain, UINT64_MAX, semaphore);
         if (res.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to acquire next image!");
         }
@@ -198,28 +197,28 @@ struct Context
 
     static void terminate()
     {
-        descPool.reset();
-        for(auto& view: swapchainImageViews) {
-            view.reset();
+        device.destroyDescriptorPool(descPool);
+        for(auto view: swapchainImageViews) {
+            device.destroyImageView(view);
         }
-        swapchain.reset();
-        commandPool.reset();
-        device.reset();
-        surface.reset();
-        messenger.reset();
-        instance.reset();
+        device.destroySwapchainKHR(swapchain);
+        device.destroyCommandPool(commandPool);
+        device.destroy();
+        instance.destroySurfaceKHR(surface);
+        instance.destroyDebugUtilsMessengerEXT(messenger);
+        instance.destroy();
     }
 
-    static inline vk::UniqueInstance instance;
-    static inline vk::UniqueDebugUtilsMessengerEXT messenger;
-    static inline vk::UniqueSurfaceKHR surface;
-    static inline vk::UniqueDevice device;
+    static inline vk::Instance instance;
+    static inline vk::DebugUtilsMessengerEXT messenger;
+    static inline vk::SurfaceKHR surface;
+    static inline vk::Device device;
     static inline vk::PhysicalDevice physicalDevice;
     static inline uint32_t queueFamily;
     static inline vk::Queue queue;
-    static inline vk::UniqueCommandPool commandPool;
-    static inline vk::UniqueSwapchainKHR swapchain;
+    static inline vk::CommandPool commandPool;
+    static inline vk::SwapchainKHR swapchain;
     static inline std::vector<vk::Image> swapchainImages;
-    static inline std::vector<vk::UniqueImageView> swapchainImageViews;
-    static inline vk::UniqueDescriptorPool descPool;
+    static inline std::vector<vk::ImageView> swapchainImageViews;
+    static inline vk::DescriptorPool descPool;
 };

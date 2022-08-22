@@ -416,7 +416,7 @@ public:
             Window::pollEvents();
             drawFrame();
         }
-        Context::device->waitIdle();
+        Context::device.waitIdle();
         cleanup();
     }
 
@@ -469,7 +469,7 @@ private:
     void cleanup()
     {
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            Context::device->destroyFence(inFlightFences[i]);
+            Context::device.destroyFence(inFlightFences[i]);
         }
         Window::terminate();
     }
@@ -515,7 +515,7 @@ private:
 
         std::array attachments{ colorAttachment, depthAttachment };
         vk::RenderPassCreateInfo renderPassInfo({}, attachments, subpass, dependency);
-        renderPass = Context::device->createRenderPassUnique(renderPassInfo);
+        renderPass = Context::device.createRenderPassUnique(renderPassInfo);
     }
 
     vk::UniqueShaderModule createShaderModule(const std::string& shaderPath)
@@ -524,7 +524,7 @@ private:
         vk::ShaderModuleCreateInfo createInfo;
         createInfo.setCodeSize(code.size());
         createInfo.setPCode(reinterpret_cast<const uint32_t*>(code.data()));
-        return Context::device->createShaderModuleUnique(createInfo);
+        return Context::device.createShaderModuleUnique(createInfo);
     }
 
     void createDescriptorSetLayout()
@@ -536,7 +536,7 @@ private:
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo;
         layoutInfo.setBindings(bindings);
-        descriptorSetLayout = Context::device->createDescriptorSetLayoutUnique(layoutInfo);
+        descriptorSetLayout = Context::device.createDescriptorSetLayoutUnique(layoutInfo);
     }
 
     void createGraphicsPipeline()
@@ -598,7 +598,7 @@ private:
 
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
         pipelineLayoutInfo.setSetLayouts(*descriptorSetLayout);
-        pipelineLayout = Context::device->createPipelineLayoutUnique(pipelineLayoutInfo);
+        pipelineLayout = Context::device.createPipelineLayoutUnique(pipelineLayoutInfo);
 
         vk::GraphicsPipelineCreateInfo pipelineInfo;
         pipelineInfo.setStages(shaderStages);
@@ -613,7 +613,7 @@ private:
         pipelineInfo.setRenderPass(*renderPass);
         pipelineInfo.setSubpass(0);
 
-        auto result = Context::device->createGraphicsPipelineUnique({}, pipelineInfo);
+        auto result = Context::device.createGraphicsPipelineUnique({}, pipelineInfo);
         if (result.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to create a pipeline!");
         }
@@ -624,21 +624,21 @@ private:
     {
         swapChainFramebuffers.reserve(Context::swapchainImageViews.size());
         for (auto const& view : Context::swapchainImageViews) {
-            std::array attachments{ *view, *depthImage.view };
+            std::array attachments{ view, *depthImage.view };
             vk::FramebufferCreateInfo framebufferInfo;
             framebufferInfo.setRenderPass(*renderPass);
             framebufferInfo.setAttachments(attachments);
             framebufferInfo.setWidth(static_cast<uint32_t>(Window::getWidth()));
             framebufferInfo.setHeight(static_cast<uint32_t>(Window::getHeight()));
             framebufferInfo.setLayers(1);
-            swapChainFramebuffers.push_back(Context::device->createFramebufferUnique(framebufferInfo));
+            swapChainFramebuffers.push_back(Context::device.createFramebufferUnique(framebufferInfo));
         }
     }
 
     void createDepthResources()
     {
         vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        depthImage.create(*Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
+        depthImage.create(Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
         depthImage.allocate(Context::physicalDevice);
         depthImage.createView(vk::ImageAspectFlagBits::eDepth);
 
@@ -656,7 +656,7 @@ private:
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
             vkBU::eVertexBuffer };
-        vertexBuffer.create(*Context::device, size, usage);
+        vertexBuffer.create(Context::device, size, usage);
         vertexBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
         vertexBuffer.copy(vertices.data());
     }
@@ -669,7 +669,7 @@ private:
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
             vkBU::eIndexBuffer };
-        indexBuffer.create(*Context::device, size, usage);
+        indexBuffer.create(Context::device, size, usage);
         indexBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
         indexBuffer.copy(indices.data());
     }
@@ -679,7 +679,7 @@ private:
         vk::DeviceSize size = sizeof(UniformBufferObject);
         uniformBuffers.resize(Context::swapchainImages.size());
         for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
-            uniformBuffers[i].create(*Context::device, size, vk::BufferUsageFlagBits::eUniformBuffer);
+            uniformBuffers[i].create(Context::device, size, vk::BufferUsageFlagBits::eUniformBuffer);
             uniformBuffers[i].allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
         }
     }
@@ -721,7 +721,7 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = indices.size() / 3;
-        bottomLevelAS.createBuffer(*Context::device, Context::physicalDevice, geometry,
+        bottomLevelAS.createBuffer(Context::device, Context::physicalDevice, geometry,
                                    vk::AccelerationStructureTypeKHR::eBottomLevel, primitiveCount);
         bottomLevelAS.create();
         bottomLevelAS.build();
@@ -739,7 +739,7 @@ private:
         asInstance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
 
         Buffer instancesBuffer;
-        instancesBuffer.create(*Context::device, sizeof(vk::AccelerationStructureInstanceKHR),
+        instancesBuffer.create(Context::device, sizeof(vk::AccelerationStructureInstanceKHR),
                                vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
                                vkBU::eShaderDeviceAddress);
         instancesBuffer.allocate(Context::physicalDevice, vkMP::eHostVisible | vkMP::eHostCoherent);
@@ -755,7 +755,7 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = 1;
-        topLevelAS.createBuffer(*Context::device, Context::physicalDevice, geometry,
+        topLevelAS.createBuffer(Context::device, Context::physicalDevice, geometry,
                                 vk::AccelerationStructureTypeKHR::eTopLevel, primitiveCount);
         topLevelAS.create();
         topLevelAS.build();
@@ -765,26 +765,26 @@ private:
     {
         std::vector layouts{ Context::swapchainImages.size(), *descriptorSetLayout };
         vk::DescriptorSetAllocateInfo allocInfo;
-        allocInfo.setDescriptorPool(*Context::descPool);
+        allocInfo.setDescriptorPool(Context::descPool);
         allocInfo.setSetLayouts(layouts);
 
         descriptorSets.resize(Context::swapchainImages.size());
-        descriptorSets = Context::device->allocateDescriptorSetsUnique(allocInfo);
+        descriptorSets = Context::device.allocateDescriptorSetsUnique(allocInfo);
 
         for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
             std::vector<vk::WriteDescriptorSet> descriptorWrites{
                 uniformBuffers[i].createDescWrite(*descriptorSets[i], vkDT::eUniformBuffer, 0),
                 topLevelAS.createDescWrite(*descriptorSets[i], 1) };
-            Context::device->updateDescriptorSets(descriptorWrites, nullptr);
+            Context::device.updateDescriptorSets(descriptorWrites, nullptr);
         }
     }
 
     void createCommandBuffers()
     {
         vk::CommandBufferAllocateInfo allocInfo;
-        allocInfo.setCommandPool(*Context::commandPool);
+        allocInfo.setCommandPool(Context::commandPool);
         allocInfo.setCommandBufferCount(static_cast<uint32_t>(swapChainFramebuffers.size()));
-        commandBuffers = Context::device->allocateCommandBuffersUnique(allocInfo);
+        commandBuffers = Context::device.allocateCommandBuffersUnique(allocInfo);
 
         std::array<vk::ClearValue, 2> clearValues;
         clearValues[0].color = { std::array{0.0f, 0.0f, 0.0f, 1.0f} };
@@ -820,16 +820,16 @@ private:
         imagesInFlight.resize(Context::swapchainImages.size());
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            imageAvailableSemaphores[i] = Context::device->createSemaphoreUnique({});
-            renderFinishedSemaphores[i] = Context::device->createSemaphoreUnique({});
-            inFlightFences[i] = Context::device->createFence({ vk::FenceCreateFlagBits::eSignaled });
+            imageAvailableSemaphores[i] = Context::device.createSemaphoreUnique({});
+            renderFinishedSemaphores[i] = Context::device.createSemaphoreUnique({});
+            inFlightFences[i] = Context::device.createFence({ vk::FenceCreateFlagBits::eSignaled });
         }
     }
 
     uint32_t acquireNextImage(size_t currentFrame)
     {
         vk::Semaphore semaphore = *imageAvailableSemaphores[currentFrame];
-        auto result = Context::device->acquireNextImageKHR(*Context::swapchain, UINT64_MAX, semaphore);
+        auto result = Context::device.acquireNextImageKHR(Context::swapchain, UINT64_MAX, semaphore);
         if (result.result != vk::Result::eSuccess) {
             throw std::runtime_error("failed to acquire next image!");
         }
@@ -838,15 +838,15 @@ private:
 
     void drawFrame()
     {
-        Context::device->waitForFences(inFlightFences[currentFrame], true, UINT64_MAX);
-        Context::device->resetFences(inFlightFences[currentFrame]);
+        Context::device.waitForFences(inFlightFences[currentFrame], true, UINT64_MAX);
+        Context::device.resetFences(inFlightFences[currentFrame]);
 
         uint32_t imageIndex = acquireNextImage(currentFrame);
         if (imagesInFlight[imageIndex]) {
-            Context::device->waitForFences(imagesInFlight[imageIndex], true, UINT64_MAX);
+            Context::device.waitForFences(imagesInFlight[imageIndex], true, UINT64_MAX);
         }
         imagesInFlight[imageIndex] = inFlightFences[currentFrame];
-        Context::device->resetFences(inFlightFences[currentFrame]);
+        Context::device.resetFences(inFlightFences[currentFrame]);
 
         updateUniformBuffer(imageIndex);
 
@@ -860,7 +860,7 @@ private:
         submitInfo.setSignalSemaphores(renderFinishedSemaphore);
         Context::queue.submit(submitInfo, inFlightFences[currentFrame]);
 
-        vk::PresentInfoKHR presentInfo{ renderFinishedSemaphore, *Context::swapchain, imageIndex };
+        vk::PresentInfoKHR presentInfo{ renderFinishedSemaphore, Context::swapchain, imageIndex };
         Context::queue.presentKHR(presentInfo);
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;

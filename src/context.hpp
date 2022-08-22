@@ -4,17 +4,11 @@
 #include <functional>
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#define TINYOBJLOADER_IMPLEMENTATION
 #include <vulkan/vulkan.hpp>
-#include <GLFW/glfw3.h>
-#include <tiny_obj_loader.h>
 
 #include "window.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
-constexpr int WIDTH = 1024;
-constexpr int HEIGHT = 1024;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -98,6 +92,7 @@ struct Context
 
             device = physicalDevice.createDeviceUnique(createInfoChain.get<vk::DeviceCreateInfo>());
             VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
+
             queue = device->getQueue(queueFamily, 0);
         }
 
@@ -108,14 +103,29 @@ struct Context
             swapchainInfo.setMinImageCount(3);
             swapchainInfo.setImageFormat(vk::Format::eB8G8R8A8Unorm);
             swapchainInfo.setImageColorSpace(vk::ColorSpaceKHR::eSrgbNonlinear);
-            swapchainInfo.setImageExtent({WIDTH, HEIGHT});
+            swapchainInfo.setImageExtent({static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight())});
             swapchainInfo.setImageArrayLayers(1);
-            swapchainInfo.setImageUsage(vk::ImageUsageFlagBits::eTransferDst);
+            swapchainInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
             swapchainInfo.setPreTransform(vk::SurfaceTransformFlagBitsKHR::eIdentity);
             swapchainInfo.setPresentMode(vk::PresentModeKHR::eFifo);
             swapchainInfo.setClipped(true);
             swapchain = device->createSwapchainKHRUnique(swapchainInfo);
             swapchainImages = device->getSwapchainImagesKHR(*swapchain);
+        }
+
+        // Create swapchain image views
+        {
+            swapchainImageViews.resize(swapchainImages.size());
+
+            vk::ImageSubresourceRange subresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+            for (size_t i = 0; i < swapchainImages.size(); i++) {
+                vk::ImageViewCreateInfo createInfo;
+                createInfo.setImage(swapchainImages[i]);
+                createInfo.setViewType(vk::ImageViewType::e2D);
+                createInfo.setFormat(vk::Format::eB8G8R8A8Unorm);
+                createInfo.setSubresourceRange(subresourceRange);
+                swapchainImageViews[i] = device->createImageViewUnique(createInfo);
+            }
         }
 
         // Create command pool
@@ -129,13 +139,13 @@ struct Context
         // Create descriptor pool
         {
             std::vector<vk::DescriptorPoolSize> poolSizes{
-                {vk::DescriptorType::eAccelerationStructureKHR, 1},
-                {vk::DescriptorType::eStorageImage, 1},
-                {vk::DescriptorType::eStorageBuffer, 3}};
+                {vk::DescriptorType::eUniformBuffer, 1},
+                {vk::DescriptorType::eAccelerationStructureKHR, 1}
+            };
 
             vk::DescriptorPoolCreateInfo poolInfo;
             poolInfo.setPoolSizes(poolSizes);
-            poolInfo.setMaxSets(1);
+            poolInfo.setMaxSets(3);
             poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
             descPool = device->createDescriptorPoolUnique(poolInfo);
         }
@@ -197,5 +207,6 @@ struct Context
     static inline vk::UniqueCommandPool commandPool;
     static inline vk::UniqueSwapchainKHR swapchain;
     static inline std::vector<vk::Image> swapchainImages;
+    static inline std::vector<vk::UniqueImageView> swapchainImageViews;
     static inline vk::UniqueDescriptorPool descPool;
 };

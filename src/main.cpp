@@ -62,7 +62,6 @@ struct Vertex
 
 struct Buffer
 {
-    vk::Device device;
     vk::UniqueBuffer buffer;
     vk::UniqueDeviceMemory memory;
     vk::DeviceSize size;
@@ -71,17 +70,16 @@ struct Buffer
     vk::DescriptorBufferInfo bufferInfo;
     void* mapped = nullptr;
 
-    void create(vk::Device device, vk::DeviceSize size, vk::BufferUsageFlags usage)
+    void create(vk::DeviceSize size, vk::BufferUsageFlags usage)
     {
-        this->device = device;
         this->size = size;
         this->usage = usage;
-        buffer = device.createBufferUnique({ {}, size, usage });
+        buffer = Context::device.createBufferUnique({ {}, size, usage });
     }
 
     void allocate(vk::MemoryPropertyFlags properties)
     {
-        vk::MemoryRequirements requirements = device.getBufferMemoryRequirements(*buffer);
+        vk::MemoryRequirements requirements = Context::device.getBufferMemoryRequirements(*buffer);
         uint32_t type = Context::findMemoryType(requirements.memoryTypeBits, properties);
 
         vk::MemoryAllocateInfo allocInfo{ requirements.size, type };
@@ -89,21 +87,21 @@ struct Buffer
             vk::MemoryAllocateFlagsInfo flagsInfo{ vk::MemoryAllocateFlagBits::eDeviceAddress };
             allocInfo.pNext = &flagsInfo;
 
-            memory = device.allocateMemoryUnique(allocInfo);
-            device.bindBufferMemory(*buffer, *memory, 0);
+            memory = Context::device.allocateMemoryUnique(allocInfo);
+            Context::device.bindBufferMemory(*buffer, *memory, 0);
 
             vk::BufferDeviceAddressInfoKHR bufferDeviceAI{ *buffer };
-            deviceAddress = device.getBufferAddressKHR(&bufferDeviceAI);
+            deviceAddress = Context::device.getBufferAddressKHR(&bufferDeviceAI);
         } else {
-            memory = device.allocateMemoryUnique(allocInfo);
-            device.bindBufferMemory(*buffer, *memory, 0);
+            memory = Context::device.allocateMemoryUnique(allocInfo);
+            Context::device.bindBufferMemory(*buffer, *memory, 0);
         }
     }
 
     void copy(void* data)
     {
         if (!mapped) {
-            mapped = device.mapMemory(*memory, 0, size);
+            mapped = Context::device.mapMemory(*memory, 0, size);
         }
         memcpy(mapped, data, size);
     }
@@ -125,7 +123,6 @@ struct Buffer
 
 struct Image
 {
-    vk::Device device;
     vk::UniqueImage image;
     vk::UniqueImageView view;
     vk::UniqueDeviceMemory memory;
@@ -134,10 +131,8 @@ struct Image
     vk::ImageLayout imageLayout;
     vk::ImageAspectFlags aspect;
 
-    void create(vk::Device device, vk::Extent2D extent,
-                vk::Format format, vk::ImageUsageFlags usage)
+    void create(vk::Extent2D extent, vk::Format format, vk::ImageUsageFlags usage)
     {
-        this->device = device;
         this->extent = extent;
         this->format = format;
 
@@ -149,17 +144,17 @@ struct Image
         createInfo.setFormat(format);
         createInfo.setTiling(vk::ImageTiling::eOptimal);
         createInfo.setUsage(usage);
-        image = device.createImageUnique(createInfo);
+        image = Context::device.createImageUnique(createInfo);
         imageLayout = vkIL::eUndefined;
     }
 
     void allocate()
     {
-        vk::MemoryRequirements requirements = device.getImageMemoryRequirements(*image);
+        vk::MemoryRequirements requirements = Context::device.getImageMemoryRequirements(*image);
         uint32_t memoryTypeIndex = Context::findMemoryType(requirements.memoryTypeBits,
                                                            vk::MemoryPropertyFlagBits::eDeviceLocal);
-        memory = device.allocateMemoryUnique({ requirements.size, memoryTypeIndex });
-        device.bindImageMemory(*image, *memory, 0);
+        memory = Context::device.allocateMemoryUnique({ requirements.size, memoryTypeIndex });
+        Context::device.bindImageMemory(*image, *memory, 0);
     }
 
     void createView(vk::ImageAspectFlags aspect)
@@ -170,7 +165,7 @@ struct Image
         createInfo.setViewType(vk::ImageViewType::e2D);
         createInfo.setFormat(format);
         createInfo.setSubresourceRange({ aspect, 0, 1, 0, 1 });
-        view = device.createImageViewUnique(createInfo);
+        view = Context::device.createImageViewUnique(createInfo);
     }
 
     bool hasStencilComponent(vk::Format format)
@@ -227,7 +222,6 @@ struct Image
         imageLayout = newLayout;
     }
 };
-
 
 std::vector<std::string> split(std::string& str, char separator)
 {
@@ -295,14 +289,11 @@ struct Mesh
     }
 };
 
-
 struct AccelerationStructure
 {
     vk::UniqueAccelerationStructureKHR handle;
     Buffer buffer;
-
-    vk::Device device;
-    vk::PhysicalDevice physicalDevice;
+    
     vk::AccelerationStructureTypeKHR type;
     uint32_t primitiveCount;
     vk::DeviceSize size;
@@ -310,14 +301,10 @@ struct AccelerationStructure
     uint64_t deviceAddress;
     vk::WriteDescriptorSetAccelerationStructureKHR asInfo;
 
-    void createBuffer(vk::Device device,
-                      vk::PhysicalDevice physicalDevice,
-                      vk::AccelerationStructureGeometryKHR geometry,
+    void createBuffer(vk::AccelerationStructureGeometryKHR geometry,
                       vk::AccelerationStructureTypeKHR type,
                       uint32_t primitiveCount)
     {
-        this->device = device;
-        this->physicalDevice = physicalDevice;
         this->type = type;
         this->primitiveCount = primitiveCount;
 
@@ -326,9 +313,9 @@ struct AccelerationStructure
         geometryInfo.setGeometries(geometry);
 
         vk::AccelerationStructureBuildSizesInfoKHR buildSizesInfo =
-            device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
+            Context::device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, geometryInfo, primitiveCount);
         size = buildSizesInfo.accelerationStructureSize;
-        buffer.create(device, size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress);
+        buffer.create(size, vkBU::eAccelerationStructureStorageKHR | vkBU::eShaderDeviceAddress);
         buffer.allocate(vkMP::eDeviceLocal);
     }
 
@@ -338,13 +325,13 @@ struct AccelerationStructure
         createInfo.setBuffer(*buffer.buffer);
         createInfo.setSize(size);
         createInfo.setType(type);
-        handle = device.createAccelerationStructureKHRUnique(createInfo);
+        handle = Context::device.createAccelerationStructureKHRUnique(createInfo);
     }
 
     void build()
     {
         Buffer scratchBuffer;
-        scratchBuffer.create(device, size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress);
+        scratchBuffer.create(size, vkBU::eStorageBuffer | vkBU::eShaderDeviceAddress);
         scratchBuffer.allocate(vkMP::eDeviceLocal);
         geometryInfo.setScratchData(scratchBuffer.deviceAddress);
         geometryInfo.setDstAccelerationStructure(*handle);
@@ -624,7 +611,7 @@ private:
     void createDepthResources()
     {
         vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-        depthImage.create(Context::device, { static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
+        depthImage.create({ static_cast<uint32_t>(Window::getWidth()), static_cast<uint32_t>(Window::getHeight()) }, vk::Format::eD32Sfloat, usage);
         depthImage.allocate();
         depthImage.createView(vk::ImageAspectFlagBits::eDepth);
 
@@ -642,7 +629,7 @@ private:
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
             vkBU::eVertexBuffer };
-        vertexBuffer.create(Context::device, size, usage);
+        vertexBuffer.create(size, usage);
         vertexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         vertexBuffer.copy(vertices.data());
     }
@@ -655,7 +642,7 @@ private:
             vkBU::eStorageBuffer |
             vkBU::eShaderDeviceAddress |
             vkBU::eIndexBuffer };
-        indexBuffer.create(Context::device, size, usage);
+        indexBuffer.create(size, usage);
         indexBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         indexBuffer.copy(indices.data());
     }
@@ -665,7 +652,7 @@ private:
         vk::DeviceSize size = sizeof(UniformBufferObject);
         uniformBuffers.resize(Context::swapchainImages.size());
         for (size_t i = 0; i < Context::swapchainImages.size(); i++) {
-            uniformBuffers[i].create(Context::device, size, vk::BufferUsageFlagBits::eUniformBuffer);
+            uniformBuffers[i].create(size, vk::BufferUsageFlagBits::eUniformBuffer);
             uniformBuffers[i].allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
         }
     }
@@ -707,7 +694,7 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = indices.size() / 3;
-        bottomLevelAS.createBuffer(Context::device, Context::physicalDevice, geometry,
+        bottomLevelAS.createBuffer(geometry,
                                    vk::AccelerationStructureTypeKHR::eBottomLevel, primitiveCount);
         bottomLevelAS.create();
         bottomLevelAS.build();
@@ -725,7 +712,7 @@ private:
         asInstance.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
 
         Buffer instancesBuffer;
-        instancesBuffer.create(Context::device, sizeof(vk::AccelerationStructureInstanceKHR),
+        instancesBuffer.create(sizeof(vk::AccelerationStructureInstanceKHR),
                                vkBU::eAccelerationStructureBuildInputReadOnlyKHR |
                                vkBU::eShaderDeviceAddress);
         instancesBuffer.allocate(vkMP::eHostVisible | vkMP::eHostCoherent);
@@ -741,7 +728,7 @@ private:
         geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
         uint32_t primitiveCount = 1;
-        topLevelAS.createBuffer(Context::device, Context::physicalDevice, geometry,
+        topLevelAS.createBuffer(geometry,
                                 vk::AccelerationStructureTypeKHR::eTopLevel, primitiveCount);
         topLevelAS.create();
         topLevelAS.build();

@@ -4,11 +4,11 @@
 void updateMatrices(Matrices& matrices)
 {
     static uint64_t frame = 0;
+    static float aspect = Window::width / static_cast<float>(Window::height);
 
     float angle = frame * glm::radians(1.0f);
     glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f));
     glm::vec3 camPos = glm::vec3(rotate * glm::vec4(12.0f, -12.0f, 12.0f, 1.0f));
-    float aspect = Window::width / static_cast<float>(Window::height);
 
     matrices.model = glm::mat4{ 1.0f };
     matrices.view = glm::lookAt(camPos, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));

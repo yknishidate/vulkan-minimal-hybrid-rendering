@@ -32,7 +32,7 @@ int main()
             GraphicsPipeline pipeline{
                 "../shaders/spv/shader.vert.spv",
                 "../shaders/spv/shader.frag.spv",
-                swapchain.extent, *swapchain.renderPass
+                swapchain.extent
             };
 
             std::vector descriptorWrites{ scene.topLevelAS.createDescWrite(0) };
@@ -49,11 +49,11 @@ int main()
                 uint32_t imageIndex = swapchain.acquireNextImage();
                 vk::CommandBuffer commandBuffer = *commandBuffers[imageIndex];
                 commandBuffer.begin(vk::CommandBufferBeginInfo{});
-                swapchain.beginRenderPass(commandBuffer, imageIndex);
+                swapchain.beginRendering(commandBuffer, imageIndex);
                 pipeline.bind(commandBuffer);
                 pipeline.pushMatrices(commandBuffer, &matrices);
                 scene.draw(commandBuffer);
-                swapchain.endRenderPass(commandBuffer);
+                swapchain.endRendering(commandBuffer, imageIndex);
                 commandBuffer.end();
 
                 swapchain.submit(commandBuffer);

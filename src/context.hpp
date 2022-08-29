@@ -36,7 +36,7 @@ struct Context
             VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
             vk::ApplicationInfo appInfo;
-            appInfo.setApiVersion(VK_API_VERSION_1_2);
+            appInfo.setApiVersion(VK_API_VERSION_1_3);
 
             instance = vk::createInstance({ {}, &appInfo, layers, extensions });
             VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
@@ -88,7 +88,9 @@ struct Context
             vk::StructureChain createInfoChain{ createInfo,
                 vk::PhysicalDeviceBufferDeviceAddressFeatures{true},
                 vk::PhysicalDeviceAccelerationStructureFeaturesKHR{true},
-                vk::PhysicalDeviceRayQueryFeaturesKHR{true} };
+                vk::PhysicalDeviceRayQueryFeaturesKHR{true},
+                vk::PhysicalDeviceDynamicRenderingFeatures{true}
+            };
 
             device = physicalDevice.createDevice(createInfoChain.get<vk::DeviceCreateInfo>());
             VULKAN_HPP_DEFAULT_DISPATCHER.init(device);

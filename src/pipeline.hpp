@@ -42,8 +42,7 @@ struct GraphicsPipeline
 
     GraphicsPipeline(const std::string& vertShaderPath,
                      const std::string& fragShaderPath,
-                     vk::Extent2D extent,
-                     vk::RenderPass renderPass)
+                     vk::Extent2D extent)
     {
         // Create descriptor set layout
         {
@@ -131,6 +130,13 @@ struct GraphicsPipeline
             colorBlending.setLogicOpEnable(VK_FALSE);
             colorBlending.setAttachments(colorBlendAttachment);
 
+            vk::Format colorFormat = vk::Format::eB8G8R8A8Unorm;
+            vk::Format depthFormat = vk::Format::eD32Sfloat;
+            vk::PipelineRenderingCreateInfo renderingInfo;
+            renderingInfo.setColorAttachmentCount(1);
+            renderingInfo.setColorAttachmentFormats(colorFormat);
+            renderingInfo.setDepthAttachmentFormat(depthFormat);
+
             vk::GraphicsPipelineCreateInfo pipelineInfo;
             pipelineInfo.setStages(shaderStages);
             pipelineInfo.setPVertexInputState(&vertexInputInfo);
@@ -141,8 +147,8 @@ struct GraphicsPipeline
             pipelineInfo.setPDepthStencilState(&depthStencil);
             pipelineInfo.setPColorBlendState(&colorBlending);
             pipelineInfo.setLayout(*pipelineLayout);
-            pipelineInfo.setRenderPass(renderPass);
             pipelineInfo.setSubpass(0);
+            pipelineInfo.setPNext(&renderingInfo);
 
             auto result = Context::device.createGraphicsPipelineUnique({}, pipelineInfo);
             if (result.result != vk::Result::eSuccess) {

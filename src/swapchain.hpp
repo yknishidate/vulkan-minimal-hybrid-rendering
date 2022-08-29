@@ -118,7 +118,7 @@ struct Swapchain
         vk::ClearValue clearColorValue;
         clearColorValue.setColor(vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} });
 
-        vk::RenderingAttachmentInfoKHR colorAttachment;
+        vk::RenderingAttachmentInfo colorAttachment;
         colorAttachment.setImageView(*imageViews[imageIndex]);
         colorAttachment.setImageLayout(vk::ImageLayout::eAttachmentOptimal);
         colorAttachment.setClearValue(clearColorValue);
